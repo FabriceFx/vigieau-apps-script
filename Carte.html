@@ -1,0 +1,278 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base target="_top">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+  <style>
+    body { margin: 0; padding: 0; font-family: 'Inter', sans-serif; overflow: hidden; background-color: #e5e5e5; }
+    #map { height: 100vh; width: 100vw; z-index: 1; }
+    
+    /* ------------------------------
+       1. PANNEAU DE SYNTHESE (GLASSMORPHISM)
+       ------------------------------ */
+    .dashboard {
+      position: absolute;
+      top: 20px;
+      right: 20px;
+      z-index: 1000;
+      background: rgba(255, 255, 255, 0.85);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border: 1px solid rgba(255, 255, 255, 0.5);
+      border-radius: 16px;
+      padding: 20px;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+      width: 260px;
+      transition: all 0.3s ease;
+    }
+    
+    .dashboard-title {
+      font-size: 16px;
+      font-weight: 700;
+      margin-bottom: 16px;
+      color: #202124;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    
+    /* ------------------------------
+       2. BOUTONS FILTRES INTERACTIFS
+       ------------------------------ */
+    .filters {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    
+    .pill {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 8px 16px;
+      border-radius: 8px;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+      opacity: 0.6;
+      border: 1px solid transparent;
+      box-shadow: inset 0 0 0 1px rgba(0,0,0,0.05);
+    }
+    
+    .pill:hover {
+      opacity: 0.8;
+      transform: translateX(4px);
+    }
+    
+    .pill.active {
+      opacity: 1;
+      transform: scale(1.02);
+      box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    }
+    
+    .pill-count {
+      background: rgba(255,255,255,0.4);
+      border-radius: 12px;
+      padding: 2px 8px;
+      font-size: 12px;
+      font-weight: 700;
+    }
+    
+    /* ------------------------------
+       3. ANIMATIONS D'URGENCE (PULSE)
+       ------------------------------ */
+    /* Animation Rouge vif pour Crise */
+    .pulse-marker-crise {
+      border-radius: 50%;
+      background-color: #d93025;
+      border: 2px solid white;
+      box-shadow: 0 0 0 rgba(217, 48, 37, 0.4);
+      animation: pulse-red 2s infinite;
+    }
+    @keyframes pulse-red {
+      0% { box-shadow: 0 0 0 0 rgba(217, 48, 37, 0.7); }
+      70% { box-shadow: 0 0 0 16px rgba(217, 48, 37, 0); }
+      100% { box-shadow: 0 0 0 0 rgba(217, 48, 37, 0); }
+    }
+    
+    /* Animation Orange pour Alerte Renforcée */
+    .pulse-marker-alerte-renf {
+      border-radius: 50%;
+      background-color: #f29900;
+      border: 2px solid white;
+      box-shadow: 0 0 0 rgba(242, 153, 0, 0.4);
+      animation: pulse-orange 2s infinite;
+    }
+    @keyframes pulse-orange {
+      0% { box-shadow: 0 0 0 0 rgba(242, 153, 0, 0.7); }
+      70% { box-shadow: 0 0 0 12px rgba(242, 153, 0, 0); }
+      100% { box-shadow: 0 0 0 0 rgba(242, 153, 0, 0); }
+    }
+    
+    /* Marqueur standard statique */
+    .static-marker {
+      border-radius: 50%;
+      border: 2px solid white;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+    }
+    
+    /* ------------------------------
+       4. POPUPS PREMIUM
+       ------------------------------ */
+    .leaflet-popup-content-wrapper {
+      border-radius: 12px;
+      box-shadow: 0 8px 24px rgba(0,0,0,0.15);
+      padding: 4px;
+    }
+    .leaflet-popup-content { margin: 12px 16px; font-family: 'Inter', sans-serif; line-height: 1.4; }
+    .popup-custom strong { font-size: 15px; color: #202124; display: block; margin-bottom: 8px; }
+    .etat-badge {
+      display: inline-block;
+      padding: 4px 10px;
+      border-radius: 20px;
+      color: white;
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Panneau flottant Glassmorphism -->
+  <div class="dashboard">
+    <div class="dashboard-title">📍 Synthèse des sites</div>
+    <div class="filters" id="filters-container">
+      <!-- Les boutons filtres seront générés ici par JS -->
+    </div>
+  </div>
+
+  <div id="map"></div>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script>
+    // Récupération des données depuis Google Apps Script
+    const sites = <?!= donneesCarto ?>;
+    
+    // Configuration des couleurs et classes CSS associées
+    const COULEURS_VIGILANCE = {
+      "Crise": { color: "#d93025", cssClass: "pulse-marker-crise" },
+      "Alerte renforcée": { color: "#f29900", cssClass: "pulse-marker-alerte-renf" },
+      "Alerte": { color: "#fbbc04", cssClass: "static-marker" },
+      "Vigilance": { color: "#4285f4", cssClass: "static-marker" },
+      "Pas de restriction": { color: "#34a853", cssClass: "static-marker" },
+      "Inconnu": { color: "#9aa0a6", cssClass: "static-marker" }
+    };
+    
+    // Ordre d'affichage des filtres
+    const ORDRE_GRAVITE = ["Crise", "Alerte renforcée", "Alerte", "Vigilance", "Pas de restriction", "Inconnu"];
+    
+    // Initialisation de la carte
+    const map = L.map('map', { zoomControl: false }).setView([46.603354, 1.888334], 6);
+    L.control.zoom({ position: 'bottomleft' }).addTo(map); // Déplace le zoom en bas à gauche
+    
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
+      maxZoom: 19,
+      attribution: '© OpenStreetMap contributors © CARTO'
+    }).addTo(map);
+
+    // Variables globales pour le filtre
+    let activeFilter = "Tous";
+    const markersLayer = L.layerGroup().addTo(map);
+    
+    // Calcul des statistiques
+    const stats = {};
+    sites.forEach(s => {
+      stats[s.etat] = (stats[s.etat] || 0) + 1;
+    });
+
+    /**
+     * Affiche les marqueurs sur la carte en fonction du filtre actif
+     */
+    function renderMarkers() {
+      markersLayer.clearLayers();
+      
+      sites.forEach(site => {
+        // Filtrage
+        if (activeFilter !== "Tous" && activeFilter !== site.etat) return;
+        
+        const config = COULEURS_VIGILANCE[site.etat] || COULEURS_VIGILANCE["Inconnu"];
+        
+        // Création de l'icône personnalisée (Permet d'utiliser du CSS pur pour l'animation)
+        let styleStr = `width: 14px; height: 14px;`;
+        if (config.cssClass === "static-marker") {
+          styleStr += ` background-color: ${config.color};`;
+        }
+        
+        const customIcon = L.divIcon({
+          className: 'custom-div-icon',
+          html: `<div style="${styleStr}" class="${config.cssClass}"></div>`,
+          iconSize: [18, 18],
+          iconAnchor: [9, 9] // Centre de l'icône
+        });
+        
+        const marker = L.marker([site.lat, site.lon], { icon: customIcon });
+        
+        // Infobulle Premium
+        const popupContent = `
+          <div class="popup-custom">
+            <strong>${site.nom}</strong>
+            <span class="etat-badge" style="background-color: ${config.color};">${site.etat}</span>
+          </div>
+        `;
+        marker.bindPopup(popupContent);
+        markersLayer.addLayer(marker);
+      });
+    }
+
+    /**
+     * Génère les boutons de filtrage interactifs dans le panneau de synthèse
+     */
+    function renderFilters() {
+      const container = document.getElementById('filters-container');
+      container.innerHTML = '';
+      
+      // Fonction pour créer un bouton
+      const createButton = (label, color, count, bgColor) => {
+        if(count === 0 && label !== "Tous") return; // Masque les états vides
+        
+        const btn = document.createElement('div');
+        btn.className = `pill ${activeFilter === label ? 'active' : ''}`;
+        btn.style.backgroundColor = bgColor;
+        btn.style.color = color;
+        
+        btn.innerHTML = `
+          <span>${label}</span>
+          <span class="pill-count" style="color: ${color}">${count}</span>
+        `;
+        
+        btn.onclick = () => {
+          activeFilter = label;
+          renderFilters();
+          renderMarkers();
+        };
+        container.appendChild(btn);
+      };
+      
+      // Bouton "Tous"
+      createButton("Tous", "#202124", sites.length, "#f1f3f4");
+      
+      // Boutons dynamiques selon l'ordre de gravité
+      ORDRE_GRAVITE.forEach(etat => {
+        if(stats[etat]) {
+          const isLightColor = (etat === "Alerte" || etat === "Pas de restriction");
+          const textColor = isLightColor ? "#202124" : "white";
+          createButton(etat, textColor, stats[etat], COULEURS_VIGILANCE[etat].color);
+        }
+      });
+    }
+
+    // Premier rendu
+    renderFilters();
+    renderMarkers();
+  </script>
+</body>
+</html>
