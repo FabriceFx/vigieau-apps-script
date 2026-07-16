@@ -8,15 +8,15 @@
 
 L'outil s'interface avec l'API officielle du gouvernement [Vigieau](https://api.vigieau.beta.gouv.fr/) et avec l'API de géocodage [GeoPF](https://data.geopf.fr/geocodage/search).
 
-## ✨ Fonctionnalités Principales
+## ✨ Fonctionnalités principales
 
-* 📍 **Géocodage Magique** : Saisissez une adresse, le script récupère automatiquement les coordonnées GPS en tâche de fond (via Trigger `onEdit`).
-* 🔄 **Synchronisation Vigieau** : Interrogation en masse de l'API Vigieau pour connaître le niveau d'alerte sécheresse (Vigilance, Alerte, Alerte Renforcée, Crise) de chaque site. 
-* 🎨 **Carte Interactive Premium** : Visualisation HTML/JS (Leaflet) intégrée dans Google Sheets. Design moderne (*Glassmorphism*), filtrage en temps réel et animations CSS (effet pulse radar) sur les sites en crise.
-* ✉️ **Rapports Automatisés** : Envoi de rapports par email contenant le détail des sites au niveau de restriction maximal (Crise).
-* ⚙️ **Tableau de Bord & Autonomie** : Configuration dynamique depuis le tableur (Choix du profil d'entreprise, paramétrage des heures de vérification). Exécution 100% autonome via les déclencheurs (Triggers) Google.
+* 📍 **Géocodage magique** : Saisissez une adresse, le script récupère automatiquement les coordonnées GPS en tâche de fond (via Trigger `onEdit`).
+* 🔄 **Synchronisation Vigieau** : Interrogation en masse de l'API Vigieau pour connaître le niveau d'alerte sécheresse (Vigilance, Alerte, Alerte renforcée, Crise) de chaque site. 
+* 🎨 **Carte interactive premium** : Visualisation HTML/JS (Leaflet) intégrée dans Google Sheets. Design moderne (*Glassmorphism*), filtrage en temps réel et animations CSS (effet pulse radar) sur les sites en crise.
+* ✉️ **Rapports automatisés** : Envoi de rapports par email contenant le détail des sites au niveau de restriction maximal (Crise).
+* ⚙️ **Tableau de bord et autonomie** : Configuration dynamique depuis le tableur (choix du profil d'entreprise, paramétrage des heures de vérification). Exécution 100% autonome via les déclencheurs (Triggers) Google.
 
-## 🚀 Installation & Utilisation
+## 🚀 Installation & utilisation
 
 ### 1. Cloner le projet
 Vous pouvez importer ce code dans votre projet Google Apps Script en utilisant [clasp](https://github.com/google/clasp) :
@@ -40,12 +40,15 @@ Depuis le menu personnalisé de Google Sheets :
 * **Automatisation du géocodage :** Cliquez sur `⚡ Activer l'automatisation de saisie`.
 * **Planifications temporelles :** Remplissez l'onglet `Configuration`, puis cliquez sur `⏳ Appliquer les planifications` pour rendre l'outil 100% autonome (synchronisation quotidienne/hebdomadaire).
 
-## 🛠 Technologies Utilisées
-* **Backend :** JavaScript (V8 Google Apps Script), CacheService, Triggers Installables.
+## 🛠 Technologies utilisées
+* **Backend :** JavaScript (V8 Google Apps Script), CacheService, Triggers installables.
 * **Frontend :** HTML5, Vanilla CSS, Leaflet.js, Google Apps Script HtmlService.
 * **APIs :** 
   * `api.vigieau.beta.gouv.fr/api/zones`
   * `data.geopf.fr/geocodage/search`
+
+## 👨‍💻 Auteur
+Développé par [Fabrice Faucheux](https://faucheux.bzh)
 
 ## 📄 Licence
 Ce projet est open-source et modifiable librement. Les données proviennent des services publics français.
