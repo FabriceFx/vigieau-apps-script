@@ -18,7 +18,17 @@ L'outil s'interface avec l'API officielle du gouvernement [Vigieau](https://api.
 
 ## 🚀 Installation & utilisation
 
-### 1. Cloner le projet
+### 1. Installation du code
+
+**Méthode 1 : Classique (Copier-Coller)**
+Si vous n'êtes pas familier avec les lignes de commande, c'est la méthode la plus simple :
+1. Dans votre Google Sheets, allez dans `Extensions` > `Apps Script`.
+2. Créez les 6 fichiers de type Script (`.gs`) : `Code.gs`, `VigiEau.gs`, `GPS.gs`, `Cato.gs`, `Mail.gs`, `Planification.gs`.
+3. Créez les 2 fichiers de type HTML (`.html`) : `Carte.html`, `Bilan.html`.
+4. Copiez-collez le contenu de chaque fichier de ce répertoire GitHub dans les fichiers correspondants de votre projet.
+5. Sauvegardez (`Ctrl+S`).
+
+**Méthode 2 : Avancée (via Clasp)**
 Vous pouvez importer ce code dans votre projet Google Apps Script en utilisant [clasp](https://github.com/google/clasp) :
 ```bash
 clasp clone <VOTRE_SCRIPT_ID>
