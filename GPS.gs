@@ -10,8 +10,8 @@ const CONFIG = {
   COLONNE_RESULTAT: 3,    // Colonne C
   URL_API: "https://data.geopf.fr/geocodage/search", 
   DELAI_PAUSE_MS: 100,
-  MESSAGE_INTROUVABLE: "Introuvable",
-  MESSAGE_ERREUR: "Erreur",
+  get MESSAGE_INTROUVABLE() { return t("NOT_FOUND"); },
+  get MESSAGE_ERREUR() { return t("ERROR_GPS"); },
   MESSAGE_VIDE: ""
 };
 
@@ -88,7 +88,7 @@ function gererEditionAutomatique(e) {
       return;
     }
     
-    feuille.getRange(ligne, CONFIG.COLONNE_RESULTAT).setValue("⏳ Calcul...");
+    feuille.getRange(ligne, CONFIG.COLONNE_RESULTAT).setValue(t("CALCULATING"));
     
     const donnees = obtenirDonneesGeographiques(adresse);
     feuille.getRange(ligne, CONFIG.COLONNE_DEPARTEMENT).setValue(donnees.departement);
@@ -112,7 +112,7 @@ function calculerGps() {
     const derniereLigne = feuille.getLastRow();
     
     if (derniereLigne < CONFIG.LIGNE_DEPART) {
-      interfaceUtilisateur.alert("Information", "Aucune adresse à traiter.", interfaceUtilisateur.ButtonSet.OK);
+      interfaceUtilisateur.alert(t("INFO_TITLE"), t("NO_ADDRESS_TO_PROCESS"), interfaceUtilisateur.ButtonSet.OK);
       return;
     }
     
@@ -145,13 +145,13 @@ function calculerGps() {
     if (modifications > 0) {
       feuille.getRange(CONFIG.LIGNE_DEPART, CONFIG.COLONNE_DEPARTEMENT, nombreDeLignes, 1).setValues(nouveauxDeps);
       feuille.getRange(CONFIG.LIGNE_DEPART, CONFIG.COLONNE_RESULTAT, nombreDeLignes, 1).setValues(nouveauxGps);
-      classeur.toast(`${modifications} site(s) ont été mis à jour de manière différentielle.`, "Mise à jour terminée", 5);
+      classeur.toast(`${modifications} ${t("SITES_UPDATED")}`, t("UPDATE_FINISHED"), 5);
     } else {
-      classeur.toast("Toutes les adresses possèdent déjà des coordonnées valides.", "Aucune mise à jour requise", 4);
+      classeur.toast(t("ALL_VALID"), t("NO_UPDATE_REQUIRED"), 4);
     }
     
   } catch (erreur) {
     console.error(`Erreur critique : ${erreur.stack}`);
-    interfaceUtilisateur.alert("Erreur d'exécution", erreur.message, interfaceUtilisateur.ButtonSet.OK);
+    interfaceUtilisateur.alert(t("ERROR_EXECUTION"), erreur.message, interfaceUtilisateur.ButtonSet.OK);
   }
 }

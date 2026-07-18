@@ -144,7 +144,7 @@
 
   <!-- Panneau flottant Glassmorphism -->
   <div class="dashboard">
-    <div class="dashboard-title">📍 Synthèse des sites</div>
+    <div class="dashboard-title"><?= t('CARTE_SYNTHESE') ?></div>
     <div class="filters" id="filters-container">
       <!-- Les boutons filtres seront générés ici par JS -->
     </div>
@@ -180,7 +180,7 @@
     }).addTo(map);
 
     // Variables globales pour le filtre
-    let activeFilter = "Tous";
+    let activeFilter = "<?= t('CARTE_TOUS') ?>";
     const markersLayer = L.layerGroup().addTo(map);
     
     // Calcul des statistiques
@@ -197,7 +197,7 @@
       
       sites.forEach(site => {
         // Filtrage
-        if (activeFilter !== "Tous" && activeFilter !== site.etat) return;
+        if (activeFilter !== "<?= t('CARTE_TOUS') ?>" && activeFilter !== site.etat) return;
         
         const config = COULEURS_VIGILANCE[site.etat] || COULEURS_VIGILANCE["Inconnu"];
         
@@ -237,7 +237,7 @@
       
       // Fonction pour créer un bouton
       const createButton = (label, color, count, bgColor) => {
-        if(count === 0 && label !== "Tous") return; // Masque les états vides
+        if(count === 0 && label !== "<?= t('CARTE_TOUS') ?>") return; // Masque les états vides
         
         const btn = document.createElement('div');
         btn.className = `pill ${activeFilter === label ? 'active' : ''}`;
@@ -258,7 +258,7 @@
       };
       
       // Bouton "Tous"
-      createButton("Tous", "#202124", sites.length, "#f1f3f4");
+      createButton("<?= t('CARTE_TOUS') ?>", "#202124", sites.length, "#f1f3f4");
       
       // Boutons dynamiques selon l'ordre de gravité
       ORDRE_GRAVITE.forEach(etat => {

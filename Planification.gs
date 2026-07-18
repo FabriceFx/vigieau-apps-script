@@ -19,7 +19,7 @@ function appliquerPlanification() {
       }
     }
     
-    let message = "✅ Anciens déclencheurs effacés.\n\nCréation des nouvelles planifications :\n\n";
+    let message = t("PLANIF_CLEARED");
     
     // 2. Création de la planification pour la synchronisation
     if (config.freqSync === "Quotidien") {
@@ -28,16 +28,16 @@ function appliquerPlanification() {
         .everyDays(1)
         .atHour(parseInt(config.heureSync))
         .create();
-      message += `🔄 Synchronisation : Quotidien à ~${config.heureSync}h00\n`;
+      message += t("PLANIF_SYNC_DAILY") + config.heureSync + "h00\n";
     } else if (config.freqSync === "Hebdomadaire") {
       ScriptApp.newTrigger("synchroniserVigilanceEau")
         .timeBased()
         .onWeekDay(ScriptApp.WeekDay.MONDAY)
         .atHour(parseInt(config.heureSync))
         .create();
-      message += `🔄 Synchronisation : Hebdomadaire (Lundi) à ~${config.heureSync}h00\n`;
+      message += t("PLANIF_SYNC_WEEKLY") + config.heureSync + "h00\n";
     } else {
-      message += `❌ Synchronisation : Désactivée\n`;
+      message += t("PLANIF_SYNC_OFF");
     }
     
     message += "\n";
@@ -49,21 +49,21 @@ function appliquerPlanification() {
         .everyDays(1)
         .atHour(parseInt(config.heureEmail))
         .create();
-      message += `✉️ Rapport Email : Quotidien à ~${config.heureEmail}h00\n`;
+      message += t("PLANIF_EMAIL_DAILY") + config.heureEmail + "h00\n";
     } else if (config.freqEmail === "Hebdomadaire") {
       ScriptApp.newTrigger("envoyerRapportCrise")
         .timeBased()
         .onWeekDay(ScriptApp.WeekDay.MONDAY)
         .atHour(parseInt(config.heureEmail))
         .create();
-      message += `✉️ Rapport Email : Hebdomadaire (Lundi) à ~${config.heureEmail}h00\n`;
+      message += t("PLANIF_EMAIL_WEEKLY") + config.heureEmail + "h00\n";
     } else {
-      message += `❌ Rapport Email : Désactivé\n`;
+      message += t("PLANIF_EMAIL_OFF");
     }
     
-    interfaceUtilisateur.alert("Planification réussie 🎉", message, interfaceUtilisateur.ButtonSet.OK);
+    interfaceUtilisateur.alert(t("PLANIF_SUCCESS_TITLE"), message, interfaceUtilisateur.ButtonSet.OK);
     
   } catch (erreur) {
-    interfaceUtilisateur.alert("Erreur", `Impossible d'appliquer la planification : ${erreur.message}`, interfaceUtilisateur.ButtonSet.OK);
+    interfaceUtilisateur.alert(t("ERROR_TITLE"), t("PLANIF_ERROR") + erreur.message, interfaceUtilisateur.ButtonSet.OK);
   }
 }

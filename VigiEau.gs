@@ -213,7 +213,7 @@ function synchroniserVigilanceEau() {
     
     const derniereLigneSites = feuilleSites.getLastRow();
     if (derniereLigneSites < CONFIG_VIGIEAU.LIGNE_DEPART_SITES) {
-      if (interfaceUtilisateur) interfaceUtilisateur.alert("Information", "Aucun site à traiter.", interfaceUtilisateur.ButtonSet.OK);
+      if (interfaceUtilisateur) interfaceUtilisateur.alert(t("INFO_TITLE"), t("NO_ADDRESS_TO_PROCESS"), interfaceUtilisateur.ButtonSet.OK);
       return;
     }
     
@@ -247,7 +247,7 @@ function synchroniserVigilanceEau() {
     }
     
     if (sitesExtraits.length === 0) {
-      if (interfaceUtilisateur) interfaceUtilisateur.alert("Information", "Aucune coordonnée valide.", interfaceUtilisateur.ButtonSet.OK);
+      if (interfaceUtilisateur) interfaceUtilisateur.alert(t("INFO_TITLE"), t("NO_VALID_COORDS"), interfaceUtilisateur.ButtonSet.OK);
       return;
     }
     
@@ -324,13 +324,13 @@ function synchroniserVigilanceEau() {
         template.nbVigilance = statsBilan.vigilance;
         template.nbNormal = statsBilan.normal;
         
-        const pageHtml = template.evaluate().setWidth(450).setHeight(400).setTitle("📍 Bilan Vigieau");
-        interfaceUtilisateur.showModalDialog(pageHtml, "📍 Bilan de Synchronisation");
+        const pageHtml = template.evaluate().setWidth(450).setHeight(400).setTitle(t("MODAL_BILAN_TITLE"));
+        interfaceUtilisateur.showModalDialog(pageHtml, t("MODAL_BILAN_TITLE"));
       }
     }
     
   } catch (erreur) {
     console.error(`Erreur critique : ${erreur.stack}`);
-    if (interfaceUtilisateur) interfaceUtilisateur.alert("Erreur d'exécution", erreur.message, interfaceUtilisateur.ButtonSet.OK);
+    if (interfaceUtilisateur) interfaceUtilisateur.alert(t("ERROR_EXECUTION"), erreur.message, interfaceUtilisateur.ButtonSet.OK);
   }
 }

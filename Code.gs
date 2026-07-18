@@ -2,21 +2,28 @@ function onOpen() {
   const interfaceUtilisateur = SpreadsheetApp.getUi();
   
   try {
-    interfaceUtilisateur.createMenu("📍 Géolocalisation & Eau")
-      .addItem("1. Calculer les données géographiques", "calculerGps")
-      .addItem("⚡ Activer l'automatisation de saisie", "installerAutomatisation")
+    interfaceUtilisateur.createMenu(t("MENU_MAIN"))
+      .addItem(t("MENU_CALC_GPS"), "calculerGps")
+      .addItem(t("MENU_ACTIVER_AUTO"), "installerAutomatisation")
       .addSeparator()
-      .addItem("2. Récupérer l'état Vigieau (Archivage)", "synchroniserVigilanceEau")
-      .addItem("3. Envoyer le rapport des sites en crise", "envoyerRapportCrise")
+      .addItem(t("MENU_SYNC"), "synchroniserVigilanceEau")
+      .addItem(t("MENU_RAPPORT"), "envoyerRapportCrise")
       .addSeparator()
-      .addItem("🗺️ Afficher la carte interactive", "afficherCarteVigilance")
+      .addItem(t("MENU_CARTE"), "afficherCarteVigilance")
       .addSeparator()
-      .addItem("⏳ Appliquer les planifications", "appliquerPlanification")
+      .addItem(t("MENU_PLANIF"), "appliquerPlanification")
+      .addSeparator()
+      .addItem(t("MENU_ABOUT"), "afficherAPropos")
       .addToUi();
       
   } catch (erreur) {
     console.error(`Erreur menu : ${erreur.stack}`);
   }
+}
+
+function afficherAPropos() {
+  const ui = SpreadsheetApp.getUi();
+  ui.alert(t("ABOUT_TITLE"), t("ABOUT_CONTENT"), ui.ButtonSet.OK);
 }
 
 function installerAutomatisation() {
@@ -27,7 +34,7 @@ function installerAutomatisation() {
     const triggers = ScriptApp.getProjectTriggers();
     for (const trigger of triggers) {
       if (trigger.getHandlerFunction() === nomFonction) {
-        interfaceUtilisateur.alert("Information", "L'automatisation magique est déjà active sur ce document.", interfaceUtilisateur.ButtonSet.OK);
+        interfaceUtilisateur.alert(t("INFO_TITLE"), t("AUTO_ALREADY_ACTIVE"), interfaceUtilisateur.ButtonSet.OK);
         return;
       }
     }
@@ -37,8 +44,8 @@ function installerAutomatisation() {
       .onEdit()
       .create();
       
-    interfaceUtilisateur.alert("Succès 🎉", "L'automatisation est activée !\n\nTapez maintenant une adresse dans l'onglet Sites et validez avec Entrée, le GPS se calculera tout seul.", interfaceUtilisateur.ButtonSet.OK);
+    interfaceUtilisateur.alert(t("SUCCESS_TITLE"), t("AUTO_SUCCESS"), interfaceUtilisateur.ButtonSet.OK);
   } catch(e) {
-    interfaceUtilisateur.alert("Erreur", "Impossible de créer le déclencheur. Veuillez vérifier vos permissions.\n\n" + e.message, interfaceUtilisateur.ButtonSet.OK);
+    interfaceUtilisateur.alert(t("ERROR_TITLE"), t("AUTO_ERROR") + e.message, interfaceUtilisateur.ButtonSet.OK);
   }
 }

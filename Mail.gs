@@ -10,7 +10,7 @@ const CONFIG_EMAIL = {
   ETAT_CRISE: "Crise",
   // Utilise par défaut l'email de la personne qui exécute le script
   DESTINATAIRE: Session.getActiveUser().getEmail(), 
-  SUJET: "🚨 Rapport Vigieau : Sites en niveau de Crise"
+  get SUJET() { return t("EMAIL_SUBJECT"); }
 };
 
 /**
@@ -151,12 +151,18 @@ function envoyerRapportCrise() {
     if (sitesEnCrise.length === 0) {
       if (interfaceUtilisateur) {
         interfaceUtilisateur.alert(
-          "Information", 
-          "Aucun site n'est actuellement en état de 'Crise' pour la journée en cours.\nAucun email n'a été envoyé.", 
+          t("INFO_TITLE"), 
+          t("EMAIL_NO_CRISIS"), 
           interfaceUtilisateur.ButtonSet.OK
         );
       }
       return;
+    }
+    
+    // Vérification du quota d'emails
+    const quotaRestant = MailApp.getRemainingDailyQuota();
+    if (quotaRestant <= 0) {
+      throw new Error("Quota d'envoi d'emails quotidien atteint.");
     }
     
     const htmlBody = genererTemplateHtmlGoogle(sitesEnCrise);
@@ -170,8 +176,8 @@ function envoyerRapportCrise() {
     
     try {
       SpreadsheetApp.getActiveSpreadsheet().toast(
-        `L'email a été envoyé avec succès à ${emailCible}.`, 
-        "Rapport envoyé", 
+        t("EMAIL_SUCCESS") + emailCible + ".", 
+        t("EMAIL_REPORT_SENT"), 
         5
       );
     } catch(e) { }
@@ -180,8 +186,8 @@ function envoyerRapportCrise() {
     console.error(`Erreur lors de l'envoi de l'email : ${erreur.stack}`);
     if (interfaceUtilisateur) {
       interfaceUtilisateur.alert(
-        "Erreur d'exécution", 
-        `Impossible d'envoyer l'email :\n\n${erreur.message}`, 
+        t("ERROR_EXECUTION"), 
+        t("ERROR_EMAIL_SEND") + erreur.message, 
         interfaceUtilisateur.ButtonSet.OK
       );
     }

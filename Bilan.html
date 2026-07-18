@@ -72,29 +72,29 @@
 </head>
 <body>
   <div class="card">
-    <div class="title">Mise à jour terminée ✨</div>
-    <div class="subtitle">La BDD a été synchronisée avec Vigieau</div>
+    <div class="title"><?= t('BILAN_UPDATE_FINISHED') ?></div>
+    <div class="subtitle"><?= t('BILAN_SYNC_DONE') ?></div>
     
     <div class="stats-grid">
       <div class="stat-box stat-crise">
         <div class="number"><?= nbCrise ?></div>
-        <div class="label">Crise</div>
+        <div class="label"><?= t('BILAN_CRISE') ?></div>
       </div>
       <div class="stat-box stat-alerte">
         <div class="number"><?= nbAlerte ?></div>
-        <div class="label">Alerte</div>
+        <div class="label"><?= t('BILAN_ALERTE') ?></div>
       </div>
       <div class="stat-box stat-vigilance">
         <div class="number"><?= nbVigilance ?></div>
-        <div class="label">Vigilance</div>
+        <div class="label"><?= t('BILAN_VIGILANCE') ?></div>
       </div>
       <div class="stat-box stat-normal">
         <div class="number"><?= nbNormal ?></div>
-        <div class="label">Normal</div>
+        <div class="label"><?= t('BILAN_NORMAL') ?></div>
       </div>
     </div>
     
-    <button class="btn-close" onclick="google.script.host.close()">Fermer le tableau de bord</button>
+    <button class="btn-close" onclick="google.script.host.close()"><?= t('BILAN_CLOSE') ?></button>
   </div>
 </body>
 </html>
