@@ -29,10 +29,12 @@ L'outil s'interface avec l'API officielle du gouvernement [Vigieau](https://api.
 **Méthode 1 : Classique (Copier-Coller)**
 Si vous n'êtes pas familier avec les lignes de commande, c'est la méthode la plus simple :
 1. Dans votre Google Sheets, allez dans `Extensions` > `Apps Script`.
-2. Créez les 7 fichiers de type Script (`.gs`) : `Code.gs`, `VigiEau.gs`, `GPS.gs`, `Cato.gs`, `Mail.gs`, `Planification.gs`, `Lang.gs`.
-3. Créez les 2 fichiers de type HTML (`.html`) : `Carte.html`, `Bilan.html`.
-4. Copiez-collez le contenu de chaque fichier de ce répertoire GitHub dans les fichiers correspondants de votre projet.
-5. Sauvegardez (`Ctrl+S`).
+2. Allez dans les paramètres du projet (roue crantée) et cochez **"Afficher le fichier manifeste 'appsscript.json' dans l'éditeur"**.
+3. Dans l'éditeur, copiez-collez le contenu du fichier `appsscript.json` de ce dépôt (ceci configure les autorisations de sécurité nécessaires).
+4. Créez les 7 fichiers de type Script (`.gs`) : `Code.gs`, `VigiEau.gs`, `GPS.gs`, `Cato.gs`, `Mail.gs`, `Planification.gs`, `Lang.gs`.
+5. Créez les 2 fichiers de type HTML (`.html`) : `Carte.html`, `Bilan.html`.
+6. Copiez-collez le contenu de chaque fichier de ce répertoire GitHub dans les fichiers correspondants de votre projet.
+7. Sauvegardez (`Ctrl+S`).
 
 **Méthode 2 : Avancée (via Clasp)**
 Vous pouvez importer ce code dans votre projet Google Apps Script en utilisant [clasp](https://github.com/google/clasp) :
@@ -79,10 +81,12 @@ The tool interfaces with the official government API [Vigieau](https://api.vigie
 **Method 1: Classic (Copy-Paste)**
 If you are not familiar with command lines, this is the easiest method:
 1. In your Google Sheets, go to `Extensions` > `Apps Script`.
-2. Create the 7 Script type files (`.gs`): `Code.gs`, `VigiEau.gs`, `GPS.gs`, `Cato.gs`, `Mail.gs`, `Planification.gs`, `Lang.gs`.
-3. Create the 2 HTML type files (`.html`): `Carte.html`, `Bilan.html`.
-4. Copy-paste the content of each file from this GitHub repository into the corresponding files of your project.
-5. Save (`Ctrl+S`).
+2. Go to Project Settings (gear icon) and check **"Show 'appsscript.json' manifest file in editor"**.
+3. In the editor, copy and paste the content of the `appsscript.json` file from this repository (this sets the strict security permissions required).
+4. Create the 7 Script type files (`.gs`): `Code.gs`, `VigiEau.gs`, `GPS.gs`, `Cato.gs`, `Mail.gs`, `Planification.gs`, `Lang.gs`.
+5. Create the 2 HTML type files (`.html`): `Carte.html`, `Bilan.html`.
+6. Copy-paste the content of each file from this GitHub repository into the corresponding files of your project.
+7. Save (`Ctrl+S`).
 
 **Method 2: Advanced (via Clasp)**
 You can import this code into your Google Apps Script project using [clasp](https://github.com/google/clasp):
