@@ -17,8 +17,20 @@ const CONFIG_APP = {
   COLONNES_SITES: {
     DEPARTEMENT: 1, // Colonne A
     ADRESSE: 2,     // Colonne B
-    GPS: 3          // Colonne C
+    GPS: 3,         // Colonne C
+    RESSOURCES: 4,  // Colonne D : ressources prélevées (ex. "AEP, SOU"), vide = valeur par défaut
+    PROFIL: 5       // Colonne E : profil du site, vide = valeur par défaut
   },
+
+  // Valeurs admises pour les ressources et les profils.
+  // Un site industriel prélève couramment sur plusieurs ressources (réseau d'eau
+  // potable pour le sanitaire, forage et/ou prise d'eau pour le process) : les
+  // restrictions diffèrent d'une ressource à l'autre, n'en interroger qu'une seule
+  // laisserait les autres hors de toute surveillance.
+  TYPES_ZONE: ["AEP", "SOU", "SUP"],
+  PROFILS: ["particulier", "entreprise", "collectivite", "agriculteur"],
+  LIBELLE_COLONNE_RESSOURCES: "Ressources",
+  LIBELLE_COLONNE_PROFIL: "Profil",
 
   COLONNES_BDD: {
     DATE: 1,        // Colonne A : Date / Horodatage
@@ -108,6 +120,10 @@ const CONFIG_APP = {
     LARGEUR: 450,
     HAUTEUR: 400
   },
+  FENETRE_AIDE: {
+    LARGEUR: 720,
+    HAUTEUR: 640
+  },
 
   // Couleurs de texte lisibles sur fond blanc (emails d'alerte)
   COULEURS_TEXTE_NIVEAU: {
@@ -162,4 +178,50 @@ function parserCoordonnees(valeur) {
  */
 function estCoordonneeValide(valeur) {
   return parserCoordonnees(valeur) !== null;
+}
+
+/**
+ * Extrait la liste des ressources déclarées pour un site.
+ * Seuls les codes reconnus sont retenus : si la colonne est utilisée à d'autres fins
+ * (des notes, par exemple), aucun jeton valide n'en ressort et l'on retombe sur la
+ * valeur par défaut plutôt que de produire des requêtes absurdes.
+ * @param {*} valeur - Contenu brut de la cellule (ex. "AEP, SOU").
+ * @param {string} defaut - Ressource à utiliser si rien d'exploitable n'est déclaré.
+ * @returns {{types: Array<string>, rejete: string}} Ressources retenues et valeur écartée éventuelle.
+ */
+function parserRessources(valeur, defaut) {
+  if (valeur === null || valeur === undefined || valeur.toString().trim() === "") {
+    return { types: [defaut], rejete: "" };
+  }
+
+  const brut = valeur.toString().trim();
+  const jetons = brut.toUpperCase().split(/[^A-Z]+/).filter(Boolean);
+  const retenus = [];
+
+  jetons.forEach(jeton => {
+    if (CONFIG_APP.TYPES_ZONE.indexOf(jeton) !== -1 && retenus.indexOf(jeton) === -1) {
+      retenus.push(jeton);
+    }
+  });
+
+  if (retenus.length === 0) return { types: [defaut], rejete: brut };
+  return { types: retenus, rejete: "" };
+}
+
+/**
+ * Extrait le profil déclaré pour un site.
+ * @param {*} valeur - Contenu brut de la cellule.
+ * @param {string} defaut - Profil à utiliser si rien d'exploitable n'est déclaré.
+ * @returns {{profil: string, rejete: string}} Profil retenu et valeur écartée éventuelle.
+ */
+function parserProfilSite(valeur, defaut) {
+  if (valeur === null || valeur === undefined || valeur.toString().trim() === "") {
+    return { profil: defaut, rejete: "" };
+  }
+
+  const brut = valeur.toString().trim();
+  const normalise = brut.toLowerCase();
+
+  if (CONFIG_APP.PROFILS.indexOf(normalise) === -1) return { profil: defaut, rejete: brut };
+  return { profil: normalise, rejete: "" };
 }

@@ -58,6 +58,52 @@ const extraireDonneesZones = (charge, profil) => {
 };
 
 /**
+ * Fusionne les relevés des différentes ressources d'un même site.
+ *
+ * Le niveau retenu est le maximum des relevés exploitables : une restriction sur le
+ * forage engage le site autant qu'une restriction sur le réseau. Un relevé partiel
+ * ne donne qu'une borne inférieure du niveau réel — il est donc marqué `incomplet`,
+ * ce qui l'exclut de la détection de transitions : une ressource manquante pourrait
+ * sinon faire passer un site pour détendu alors qu'on ignore simplement son état.
+ *
+ * @param {Array<Object>} releves - [{ type, donnees|null, etatEchec }] pour un site.
+ * @returns {{etat: string, zones: Array<Object>, incomplet: boolean, ressources: Array<string>}} Synthèse du site.
+ */
+const agregerReleves = (releves) => {
+  const exploitables = releves.filter(releve => releve.donnees);
+
+  if (exploitables.length === 0) {
+    const premierEchec = releves.find(releve => releve.etatEchec);
+    return {
+      etat: premierEchec ? premierEchec.etatEchec : "Erreur d'API",
+      zones: [],
+      incomplet: true,
+      ressources: releves.map(releve => releve.type)
+    };
+  }
+
+  let etat = exploitables[0].donnees.etat;
+  let poidsMax = poidsDeLEtat(etat);
+  const zones = [];
+
+  exploitables.forEach(releve => {
+    const poids = poidsDeLEtat(releve.donnees.etat);
+    if (poids > poidsMax) {
+      poidsMax = poids;
+      etat = releve.donnees.etat;
+    }
+    (releve.donnees.zones || []).forEach(zone => zones.push(zone));
+  });
+
+  return {
+    etat: etat,
+    zones: zones,
+    incomplet: exploitables.length < releves.length,
+    ressources: exploitables.map(releve => releve.type)
+  };
+};
+
+/**
  * Sérialise les données de zones pour le cache.
  * Renvoie une chaîne vide si l'objet dépasse la taille admissible par entrée : mieux
  * vaut refaire l'appel demain que de perdre l'écriture de tout le lot.

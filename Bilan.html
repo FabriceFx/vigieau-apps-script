@@ -52,6 +52,18 @@
     .stat-vigilance { background: #e8f0fe; color: #1a73e8; }
     .stat-normal { background: #e6f4ea; color: #137333; }
     
+    .alerte-incomplet {
+      background: #fef7e0;
+      border: 1px solid #f5d99b;
+      color: #8a5100;
+      border-radius: 8px;
+      padding: 12px 16px;
+      font-size: 13px;
+      font-weight: 600;
+      text-align: left;
+      margin-bottom: 16px;
+    }
+
     .alerte-restrictions {
       background: #f1f3f4;
       border: 1px solid #dadce0;
@@ -129,6 +141,10 @@
         <div class="label"><?= t('BILAN_NORMAL') ?></div>
       </div>
     </div>
+
+    <? if (nbIncomplet > 0) { ?>
+      <div class="alerte-incomplet">◐ <?= nbIncomplet ?> <?= t('BILAN_INCOMPLET') ?></div>
+    <? } ?>
 
     <? if (nbRestrictions > 0) { ?>
       <div class="alerte-restrictions">📄 <?= nbRestrictions ?> <?= t('BILAN_RESTRICTIONS') ?></div>

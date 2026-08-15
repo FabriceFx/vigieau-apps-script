@@ -71,6 +71,10 @@ const detecterTransitions = (etatsPrecedents, sitesExtraits, etatsParSite, donne
     // déclencherait des alertes à chaque incident réseau.
     if (!estEtatFiable(apres)) return;
 
+    // Un relevé partiel ne donne qu'une borne inférieure du niveau : une ressource
+    // manquante ferait apparaître un allègement qui n'a peut-être pas eu lieu.
+    if (zones[index] && zones[index].incomplet) return;
+
     const nom = site.nomSite.toString().trim();
     const avant = etatsPrecedents.get(nom);
     const poidsApres = poidsDeLEtat(apres);

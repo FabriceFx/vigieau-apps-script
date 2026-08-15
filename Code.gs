@@ -3,6 +3,8 @@ function onOpen() {
   
   try {
     interfaceUtilisateur.createMenu(t("MENU_MAIN"))
+      .addItem(t("MENU_SETUP"), "configurerClasseur")
+      .addSeparator()
       .addItem(t("MENU_CALC_GPS"), "calculerGps")
       .addItem(t("MENU_ACTIVER_AUTO"), "installerAutomatisation")
       .addSeparator()
@@ -13,6 +15,7 @@ function onOpen() {
       .addSeparator()
       .addItem(t("MENU_PLANIF"), "appliquerPlanification")
       .addSeparator()
+      .addItem(t("MENU_AIDE"), "afficherAide")
       .addItem(t("MENU_ABOUT"), "afficherAPropos")
       .addToUi();
       

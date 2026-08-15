@@ -29,6 +29,10 @@ L'application s'interface directement avec l'API officielle de l'État [Vigieau]
 * 🔄 **Synchronisation & Historique d'archivage (BDD)** :
   * Relevé automatique des niveaux de gravité (*Vigilance*, *Alerte*, *Alerte renforcée*, *Crise*).
   * Journal chronologique *append-only* horodaté avec liens Google Maps dynamiques en texte enrichi (indépendants des formats régionaux).
+* 💧 **Ressources et profil déclarés par site** :
+  * Chaque site déclare les ressources sur lesquelles il prélève (`AEP` réseau, `SOU` souterraine, `SUP` superficielle) : un site industriel combine couramment réseau et forage, dont les restrictions diffèrent.
+  * Un relevé par ressource, le niveau le plus contraignant étant retenu. L'onglet `Configuration` ne fournit plus que les valeurs par défaut.
+  * Si une ressource ne répond pas, le relevé est marqué partiel et exclu du différentiel : une donnée manquante ne peut pas passer pour un allègement.
 * 📜 **Instantané des restrictions d'usages & Arrêtés officiels** :
   * L'onglet **Restrictions** détaille avec précision ce qui est interdit ou restreint (arrosage, lavage, process, remplissage).
   * Filtrage automatique selon votre profil métier configuré (*Entreprise*, *Collectivité*, *Exploitant agricole*, *Particulier*).
@@ -75,25 +79,29 @@ clasp push
 1. Dans votre Google Sheets, rendez-vous dans **Extensions** > **Apps Script**.
 2. Dans les paramètres du projet (icône roue dentée), cochez **"Afficher le fichier manifeste 'appsscript.json' dans l'éditeur"**.
 3. Copiez le contenu de `appsscript.json` pour configurer les autorisations de sécurité minimales.
-4. Créez les **10 fichiers Script (`.gs`)** :
-   - `Config.gs`, `Code.gs`, `VigiEau.gs`, `GPS.gs`, `Restrictions.gs`, `Transitions.gs`, `Cato.gs`, `Mail.gs`, `Planification.gs`, `Lang.gs`.
-5. Créez les **2 fichiers HTML (`.html`)** :
-   - `Carte.html`, `Bilan.html`.
+4. Créez les **11 fichiers Script (`.gs`)** :
+   - `Config.gs`, `Code.gs`, `Initialisation.gs`, `VigiEau.gs`, `GPS.gs`, `Restrictions.gs`, `Transitions.gs`, `Cato.gs`, `Mail.gs`, `Planification.gs`, `Lang.gs`.
+5. Créez les **3 fichiers HTML (`.html`)** :
+   - `Carte.html`, `Bilan.html`, `Aide.html`.
 6. Collez-y le code correspondant issu de ce dépôt et enregistrez (`Ctrl + S` / `Cmd + S`).
 
 ---
 
 ### 📋 Guide de démarrage rapide
 
-1. Dans votre classeur, créez un onglet nommé **`Sites`** avec en-têtes :
+1. Rechargez le classeur (ou exécutez `onOpen()`) pour faire apparaître le menu **📍 Géolocalisation & eau**.
+2. Cliquez sur **`🚀 Configurer le classeur`** : les onglets `Sites`, `BDD`, `Restrictions` et `Configuration` sont créés et mis en forme, et la feuille vierge par défaut est retirée si elle est vide. L'onglet `Sites` a alors la structure suivante :
    - Colonne A : `Département`
    - Colonne B : `Adresse`
    - Colonne C : `GPS`
-2. Renseignez vos adresses postales en Colonne B.
-3. Exécutez la fonction `onOpen()` (ou rechargez la page) pour afficher le menu **📍 Géolocalisation & eau**.
+   - Colonne D : `Ressources` *(facultatif)* — ressources prélevées, séparées par une virgule : `AEP`, `SOU`, `SUP`. Vide = valeur par défaut de l'onglet `Configuration`.
+   - Colonne E : `Profil` *(facultatif)* — `particulier`, `entreprise`, `collectivite` ou `agriculteur`. Vide = valeur par défaut.
+3. Renseignez vos adresses postales en Colonne B.
 4. Cliquez sur **`1. Calculer les données géographiques`** pour renseigner automatiquement les coordonnées GPS.
-5. Cliquez sur **`2. Récupérer l'état Vigieau (Archivage)`** : le script crée et initialise automatiquement les onglets `Configuration`, `BDD` et `Restrictions`.
+5. Cliquez sur **`2. Récupérer l'état Vigieau (Archivage)`** pour archiver les niveaux et relever les restrictions en vigueur.
 6. Ajustez vos préférences dans l'onglet `Configuration`, puis cliquez sur **`⏳ Appliquer les planifications`** pour rendre le suivi 100% autonome.
+
+> 💡 Le menu **`❓ Comment ça marche`** ouvre une fenêtre détaillant le rôle de chaque onglet et le fonctionnement des alertes.
 
 ---
 
@@ -117,6 +125,10 @@ The application interfaces directly with the official French Government API [Vig
 * 🔄 **Synchronization & Immutable Archiving (BDD)**:
   * Automatic retrieval of drought restriction levels (*Vigilance*, *Alert*, *Reinforced Alert*, *Crisis*).
   * Chronological *append-only* audit log with locale-agnostic Google Maps rich text links.
+* 💧 **Per-Site Resources & Profile**:
+  * Each site declares the resources it draws from (`AEP` mains, `SOU` groundwater, `SUP` surface water): an industrial site commonly combines mains supply and a borehole, whose restrictions differ.
+  * One reading per resource, keeping the most restrictive level. The `Configuration` tab now only provides default values.
+  * If a resource fails to respond, the reading is flagged as partial and excluded from the differential: missing data can never look like an easing of restrictions.
 * 📜 **Live Restrictions Snapshot & Official Decrees**:
   * The **Restrictions** tab outlines exactly what is restricted or prohibited (watering, cleaning, manufacturing, filling).
   * Filtered by profile (*Company*, *Local Authority*, *Farmer*, *Individual*).
@@ -163,25 +175,29 @@ clasp push
 1. In Google Sheets, open **Extensions** > **Apps Script**.
 2. In Project Settings (gear icon), check **"Show 'appsscript.json' manifest file in editor"**.
 3. Paste the contents of `appsscript.json` to configure the required OAuth permissions.
-4. Create the **10 Script files (`.gs`)**:
-   - `Config.gs`, `Code.gs`, `VigiEau.gs`, `GPS.gs`, `Restrictions.gs`, `Transitions.gs`, `Cato.gs`, `Mail.gs`, `Planification.gs`, `Lang.gs`.
-5. Create the **2 HTML files (`.html`)**:
-   - `Carte.html`, `Bilan.html`.
+4. Create the **11 Script files (`.gs`)**:
+   - `Config.gs`, `Code.gs`, `Initialisation.gs`, `VigiEau.gs`, `GPS.gs`, `Restrictions.gs`, `Transitions.gs`, `Cato.gs`, `Mail.gs`, `Planification.gs`, `Lang.gs`.
+5. Create the **3 HTML files (`.html`)**:
+   - `Carte.html`, `Bilan.html`, `Aide.html`.
 6. Paste the respective code and save (`Ctrl + S` / `Cmd + S`).
 
 ---
 
 ### 📋 Quickstart
 
-1. Create a sheet named **`Sites`** with headers:
+1. Reload the spreadsheet (or run `onOpen()`) to display the **📍 Géolocalisation & eau** menu.
+2. Click **`🚀 Configurer le classeur`**: the `Sites`, `BDD`, `Restrictions` and `Configuration` tabs are created and formatted, and the default blank sheet is removed if empty. The `Sites` tab then has the following structure:
    - Column A: `Département`
    - Column B: `Adresse`
    - Column C: `GPS`
-2. Add your postal addresses in Column B.
-3. Trigger `onOpen()` (or reload your spreadsheet) to display the **📍 Géolocalisation & eau** menu.
+   - Column D: `Ressources` *(optional)* — resources drawn from, comma-separated: `AEP`, `SOU`, `SUP`. Empty = default value from the `Configuration` tab.
+   - Column E: `Profil` *(optional)* — `particulier`, `entreprise`, `collectivite` or `agriculteur`. Empty = default value.
+3. Add your postal addresses in Column B.
 4. Click **`1. Calculer les données géographiques`** to geocode all addresses.
-5. Click **`2. Récupérer l'état Vigieau (Archivage)`** : the script automatically generates and formats the `Configuration`, `BDD`, and `Restrictions` sheets.
+5. Click **`2. Récupérer l'état Vigieau (Archivage)`** to archive the levels and collect the restrictions in force.
 6. Configure your preferences in `Configuration` and click **`⏳ Appliquer les planifications`** to activate autonomous background tracking.
+
+> 💡 The **`❓ Comment ça marche`** menu opens a window detailing the role of each tab and how alerts work.
 
 ---
 

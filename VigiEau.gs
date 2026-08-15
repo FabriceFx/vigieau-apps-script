@@ -177,6 +177,32 @@ const initialiserFeuilleBdd = (classeur) => {
 };
 
 /**
+ * Pose les en-têtes des colonnes facultatives de l'onglet Sites (Ressources, Profil).
+ * L'en-tête n'est écrit que si la colonne est entièrement vierge : un classeur qui
+ * utilise déjà ces colonnes à d'autres fins n'est jamais écrasé — et les valeurs
+ * non reconnues qui s'y trouveraient sont de toute façon ignorées à la lecture.
+ * @param {SpreadsheetApp.Sheet} feuilleSites - L'onglet Sites.
+ */
+const assurerColonnesSites = (feuilleSites) => {
+  const derniereLigne = Math.max(feuilleSites.getLastRow(), 1);
+
+  const colonnes = [
+    { index: CONFIG_APP.COLONNES_SITES.RESSOURCES, libelle: CONFIG_APP.LIBELLE_COLONNE_RESSOURCES },
+    { index: CONFIG_APP.COLONNES_SITES.PROFIL, libelle: CONFIG_APP.LIBELLE_COLONNE_PROFIL }
+  ];
+
+  colonnes.forEach(colonne => {
+    const valeurs = feuilleSites.getRange(1, colonne.index, derniereLigne, 1).getValues();
+    const occupee = valeurs.some(([valeur]) => valeur !== "" && valeur !== null && valeur !== undefined);
+    if (occupee) return;
+
+    feuilleSites.getRange(1, colonne.index)
+      .setValue(colonne.libelle)
+      .setFontWeight("bold");
+  });
+};
+
+/**
  * Ajoute un paramètre à l'onglet Configuration s'il n'y figure pas encore.
  * Permet d'introduire une option sans que les classeurs existants restent bloqués
  * sur la valeur par défaut, sans possibilité de la changer depuis l'interface.
@@ -225,8 +251,8 @@ const recupererConfigurationUtilisateur = (classeur) => {
     
     const enTetes = [["Paramètre", "Valeur", "Description"]];
     const donnees = [
-      ["Profil", "entreprise", "Options : particulier, entreprise, collectivite, agriculteur"],
-      ["Type de zone", "AEP", "Options : AEP (Eau potable), SOU (Souterraine), SUP (Superficielle)"],
+      ["Profil", "entreprise", "Profil par défaut si la colonne Profil de l'onglet Sites est vide. Options : particulier, entreprise, collectivite, agriculteur"],
+      ["Type de zone", "AEP", "Ressource par défaut si la colonne Ressources de l'onglet Sites est vide. Options : AEP (Eau potable), SOU (Souterraine), SUP (Superficielle)"],
       ["Email du destinataire", "", "Laissez vide pour envoyer à l'utilisateur courant"],
       ["Fréquence Synchronisation", "Désactivé", "Options : Désactivé, Quotidien, Hebdomadaire"],
       ["Heure Synchronisation", "08", "Heure de 00 à 23"],
@@ -362,6 +388,8 @@ function synchroniserVigilanceEau() {
     
     const colNomSite = CONFIG_APP.COLONNES_SITES.ADRESSE;
     const colGps = CONFIG_APP.COLONNES_SITES.GPS;
+    const colRessources = CONFIG_APP.COLONNES_SITES.RESSOURCES;
+    const colProfil = CONFIG_APP.COLONNES_SITES.PROFIL;
     const ligneDepartSites = CONFIG_APP.LIGNE_DEPART_DONNEES;
 
     const derniereLigneSites = feuilleSites.getLastRow();
@@ -370,9 +398,13 @@ function synchroniserVigilanceEau() {
       return;
     }
     
-    const maxColonne = Math.max(colNomSite, colGps);
+    // Les en-têtes des colonnes facultatives ne sont posés que si elles sont vierges :
+    // une colonne déjà utilisée à d'autres fins n'est jamais écrasée.
+    assurerColonnesSites(feuilleSites);
+
+    const maxColonne = Math.max(colNomSite, colGps, colRessources, colProfil);
     const donneesSites = feuilleSites.getRange(ligneDepartSites, 1, derniereLigneSites - ligneDepartSites + 1, maxColonne).getValues();
-    
+
     // 2. Récupération des paramètres dynamiques depuis l'onglet Configuration
     const parametresVigieau = recupererConfigurationUtilisateur(classeur);
     
@@ -384,19 +416,48 @@ function synchroniserVigilanceEau() {
     
     const cache = CacheService.getScriptCache();
     const sitesExtraits = [];
-    
+    const ressourcesRejetees = [];
+    const profilsRejetes = [];
+
     for (const ligne of donneesSites) {
       const nomSite = ligne[colNomSite - 1];
       const gps = ligne[colGps - 1];
       const coords = parserCoordonnees(gps);
-      
-      if (coords) {
-        // Clé de cache contextualisée par profil et type de zone
-        const cleCache = `${CONFIG_APP.PREFIXE_CACHE}${coords.lat}_${coords.lon}_${parametresVigieau.profil}_${parametresVigieau.zoneType}`;
-        sitesExtraits.push({ nomSite: nomSite || "Site Inconnu", lat: coords.lat, lon: coords.lon, cleCache });
-      }
+
+      if (!coords) continue;
+
+      // Ressources et profil se déclarent par site, la configuration ne fournissant
+      // plus qu'une valeur par défaut.
+      const ressources = parserRessources(ligne[colRessources - 1], parametresVigieau.zoneType);
+      const profilSite = parserProfilSite(ligne[colProfil - 1], parametresVigieau.profil);
+
+      if (ressources.rejete && ressourcesRejetees.indexOf(ressources.rejete) === -1) ressourcesRejetees.push(ressources.rejete);
+      if (profilSite.rejete && profilsRejetes.indexOf(profilSite.rejete) === -1) profilsRejetes.push(profilSite.rejete);
+
+      // Un relevé par ressource : la clé de cache reste contextualisée par profil et type.
+      const releves = ressources.types.map(type => ({
+        type: type,
+        cleCache: `${CONFIG_APP.PREFIXE_CACHE}${coords.lat}_${coords.lon}_${profilSite.profil}_${type}`
+      }));
+
+      sitesExtraits.push({
+        nomSite: nomSite || "Site Inconnu",
+        lat: coords.lat,
+        lon: coords.lon,
+        profil: profilSite.profil,
+        releves: releves
+      });
     }
-    
+
+    // Un signalement groupé plutôt qu'un par ligne : informatif sans être assourdissant
+    // quand la colonne est utilisée à d'autres fins.
+    if (ressourcesRejetees.length > 0) {
+      console.warn(`Colonne "${CONFIG_APP.LIBELLE_COLONNE_RESSOURCES}" : valeurs non reconnues, ressource par défaut appliquée — ${ressourcesRejetees.join(" | ")}`);
+    }
+    if (profilsRejetes.length > 0) {
+      console.warn(`Colonne "${CONFIG_APP.LIBELLE_COLONNE_PROFIL}" : valeurs non reconnues, profil par défaut appliqué — ${profilsRejetes.join(" | ")}`);
+    }
+
     if (sitesExtraits.length === 0) {
       if (interfaceUtilisateur) interfaceUtilisateur.alert(t("INFO_TITLE"), t("NO_VALID_COORDS"), interfaceUtilisateur.ButtonSet.OK);
       return;
@@ -409,10 +470,12 @@ function synchroniserVigilanceEau() {
     // la comparaison porterait sur la mesure que l'on vient d'écrire.
     const etatsPrecedents = construireEtatsPrecedents(feuilleSuivi);
 
-    const clesCache = sitesExtraits.map(s => s.cleCache);
+    // Toutes les clés, tous sites et toutes ressources confondus.
+    const clesCache = [];
+    sitesExtraits.forEach(site => site.releves.forEach(releve => clesCache.push(releve.cleCache)));
     const dictionnaireCache = cache.getAll(clesCache);
-    
-    const sitesPourAPI = [];
+
+    const relevesPourAPI = [];
     const requetesApi = [];
 
     // L'état est mémorisé à l'index du site pour que la BDD conserve strictement l'ordre de
@@ -421,18 +484,19 @@ function synchroniserVigilanceEau() {
     // Usages restreints et arrêté associés, mêmes index : alimentent l'onglet Restrictions.
     const donneesParSite = new Array(sitesExtraits.length).fill(null);
 
-    sitesExtraits.forEach((site, index) => {
-      const enCache = lireCacheZones(dictionnaireCache[site.cleCache]);
-      if (enCache) {
-        etatsParSite[index] = enCache.etat;
-        donneesParSite[index] = enCache;
-        return;
-      }
-      sitesPourAPI.push({ site, index });
-      const parametres = `lon=${site.lon}&lat=${site.lat}&profil=${encodeURIComponent(parametresVigieau.profil)}&zoneType=${encodeURIComponent(parametresVigieau.zoneType)}`;
-      requetesApi.push({
-        url: `${CONFIG_APP.API.VIGIEAU}?${parametres}`,
-        muteHttpExceptions: true
+    sitesExtraits.forEach(site => {
+      site.releves.forEach(releve => {
+        const enCache = lireCacheZones(dictionnaireCache[releve.cleCache]);
+        if (enCache) {
+          releve.donnees = enCache;
+          return;
+        }
+        relevesPourAPI.push({ site, releve });
+        const parametres = `lon=${site.lon}&lat=${site.lat}&profil=${encodeURIComponent(site.profil)}&zoneType=${encodeURIComponent(releve.type)}`;
+        requetesApi.push({
+          url: `${CONFIG_APP.API.VIGIEAU}?${parametres}`,
+          muteHttpExceptions: true
+        });
       });
     });
 
@@ -440,8 +504,9 @@ function synchroniserVigilanceEau() {
       const reponses = executerRequetesAvecRetry(requetesApi, CONFIG_APP.MAX_RETRIES);
       const cacheASauvegarder = {};
 
-      sitesPourAPI.forEach((entree, rang) => {
+      relevesPourAPI.forEach((entree, rang) => {
         const reponse = reponses[rang];
+        const repere = `"${entree.site.nomSite}" (${entree.releve.type})`;
         let etatVigilance = "Erreur d'API";
         let donneesZones = null;
 
@@ -449,27 +514,29 @@ function synchroniserVigilanceEau() {
           const code = reponse.getResponseCode();
           if (code === 200) {
             try {
-              donneesZones = extraireDonneesZones(JSON.parse(reponse.getContentText()), parametresVigieau.profil);
+              donneesZones = extraireDonneesZones(JSON.parse(reponse.getContentText()), entree.site.profil);
               etatVigilance = donneesZones.etat;
             } catch (e) {
               etatVigilance = "Réponse API invalide";
               donneesZones = null;
             }
           } else {
-            console.error(`Vigieau HTTP ${code} pour "${entree.site.nomSite}" : ${reponse.getContentText().substring(0, 200)}`);
+            console.error(`Vigieau HTTP ${code} pour ${repere} : ${reponse.getContentText().substring(0, 200)}`);
           }
         } else {
-          console.error(`Aucune réponse réseau Vigieau pour "${entree.site.nomSite}".`);
+          console.error(`Aucune réponse réseau Vigieau pour ${repere}.`);
         }
 
-        // Seul un état mesuré et fiable est mis en cache
+        // Un état non fiable n'est ni mémorisé, ni retenu comme relevé exploitable.
         if (estEtatFiable(etatVigilance)) {
-          const valeur = ecrireCacheZones(donneesZones || { etat: etatVigilance, zones: [] });
-          if (valeur) cacheASauvegarder[entree.site.cleCache] = valeur;
+          const donneesRetenues = donneesZones || { etat: etatVigilance, zones: [] };
+          const valeur = ecrireCacheZones(donneesRetenues);
+          if (valeur) cacheASauvegarder[entree.releve.cleCache] = valeur;
+          entree.releve.donnees = donneesRetenues;
+        } else {
+          entree.releve.donnees = null;
+          entree.releve.etatEchec = etatVigilance;
         }
-
-        etatsParSite[entree.index] = etatVigilance;
-        donneesParSite[entree.index] = donneesZones;
       });
 
       if (Object.keys(cacheASauvegarder).length > 0) {
@@ -477,14 +544,35 @@ function synchroniserVigilanceEau() {
       }
     }
 
+    // Fusion des ressources de chaque site : le niveau retenu est le plus contraignant.
+    sitesExtraits.forEach((site, index) => {
+      const synthese = agregerReleves(site.releves);
+      etatsParSite[index] = synthese.etat;
+      donneesParSite[index] = synthese;
+
+      if (synthese.incomplet && estEtatFiable(synthese.etat)) {
+        const manquantes = site.releves
+          .filter(releve => !releve.donnees)
+          .map(releve => releve.type)
+          .join(", ");
+        console.error(`Relevé incomplet pour "${site.nomSite}" : ressource(s) ${manquantes} indisponible(s). Le niveau affiché est une borne inférieure.`);
+      }
+    });
+
     const nouvellesLignes = [];
     const couleursLignes = [];
     const liensMaps = [];
-    const statsBilan = { crise: 0, alerte: 0, vigilance: 0, normal: 0, erreur: 0 };
+    const statsBilan = { crise: 0, alerte: 0, vigilance: 0, normal: 0, erreur: 0, incomplet: 0 };
 
     sitesExtraits.forEach((site, index) => {
       const etatVigilance = etatsParSite[index] || "Erreur d'API";
       comptabiliserStatistiques(etatVigilance, statsBilan);
+
+      // Un site dont une ressource manque est comptabilisé à part : son niveau est
+      // connu, mais partiellement.
+      if (donneesParSite[index] && donneesParSite[index].incomplet && estEtatFiable(etatVigilance)) {
+        statsBilan.incomplet++;
+      }
 
       nouvellesLignes.push([dateFormatee, site.nomSite, etatVigilance, semaineISO, jour, mois, CONFIG_APP.LIBELLE_LIEN_MAPS]);
       liensMaps.push(`https://www.google.com/maps/search/?api=1&query=${site.lat},${site.lon}`);
@@ -546,6 +634,7 @@ function synchroniserVigilanceEau() {
         template.nbErreur = statsBilan.erreur;
         template.nbTransitions = nbTransitions;
         template.nbRestrictions = nbRestrictions;
+        template.nbIncomplet = statsBilan.incomplet;
 
         const pageHtml = template.evaluate()
           .setWidth(CONFIG_APP.FENETRE_BILAN.LARGEUR)

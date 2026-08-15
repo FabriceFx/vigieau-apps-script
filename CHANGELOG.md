@@ -2,6 +2,23 @@
 
 Toutes les modifications notables de ce projet seront documentées dans ce fichier.
 
+## [1.6.0] - 2026-08-15
+### Ajouté
+- **Menu « 🚀 Configurer le classeur »** (`Initialisation.gs`) : prépare l'ensemble du classeur en une opération, au lieu de laisser les onglets se créer au fil de l'eau selon la fonction lancée en premier. Crée `Sites`, `BDD`, `Restrictions` et `Configuration`, applique la même mise en forme d'en-tête aux quatre (gras, blanc sur bleu, centré, première ligne figée) et les range dans l'ordre d'utilisation.
+  - L'onglet `Sites` reçoit ses cinq en-têtes, ses largeurs de colonnes, une liste déroulante sur `Profil` et des notes rappelant les valeurs admises pour `Ressources` et `Profil`.
+  - Opération **idempotente** : un onglet existant n'est jamais réécrit, seules les colonnes facultatives manquantes sont ajoutées. Le rangement des onglets n'a lieu que si au moins un onglet a été créé, un classeur déjà en service pouvant avoir un ordre voulu.
+  - **Suppression de la feuille vierge par défaut** créée avec le classeur, sous trois conditions cumulatives : ce n'est pas un onglet de l'outil, son nom correspond à un nom par défaut de Google (`Feuille 1`, `Sheet1`, `Hoja 1`… — 12 langues), et elle est **entièrement vide**. Une feuille contenant la moindre donnée n'est jamais supprimée, et jamais la dernière feuille d'un classeur.
+- **Menu « ❓ Comment ça marche »** (`Aide.html`) : fenêtre expliquant le rôle de chaque onglet, les quatre étapes de démarrage, les deux types d'alertes et l'automatisation. Bilingue comme le reste de l'interface.
+
+## [1.5.0] - 2026-08-15
+### Ajouté
+- **Ressources et profil déclarés par site** (colonnes `Ressources` et `Profil` de l'onglet `Sites`). Un seul type de zone s'appliquait jusqu'ici à tous les sites via l'onglet `Configuration`. Or un site industriel prélève couramment sur plusieurs ressources — réseau d'eau potable pour le sanitaire, forage et/ou prise d'eau pour le process — et les restrictions diffèrent d'une ressource à l'autre : n'en interroger qu'une laissait les autres hors de toute surveillance. Vérifié sur l'API : aux mêmes coordonnées, `AEP` et `SOU` renvoient deux zones distinctes.
+  - Un relevé est effectué par couple (site, ressource) ; le niveau archivé dans la BDD est le plus contraignant, et l'onglet `Restrictions` liste les usages de toutes les ressources, chacun identifié par sa zone et son type.
+  - Les valeurs de l'onglet `Configuration` deviennent des **valeurs par défaut**, appliquées aux sites qui ne déclarent rien.
+  - Seuls les codes reconnus (`AEP`, `SOU`, `SUP`) et les profils valides sont retenus, quelle que soit la casse ou le séparateur. Une colonne utilisée à d'autres fins ne produit donc aucune requête absurde : on retombe sur la valeur par défaut, avec un signalement groupé des valeurs écartées plutôt qu'un avertissement par ligne.
+  - `assurerColonnesSites` pose les en-têtes uniquement si les colonnes sont entièrement vierges : un classeur qui utilise déjà ces colonnes n'est jamais écrasé.
+- **Relevés partiels identifiés comme tels.** Si une ressource d'un site ne répond pas, le niveau retenu n'est qu'une **borne inférieure** du niveau réel. Ces relevés sont marqués `incomplet`, signalés dans le bilan (clé `BILAN_INCOMPLET`) et journalisés — surtout, ils sont **exclus de la détection de transitions** : une ressource manquante aurait sinon pu faire apparaître un allègement qui n'a pas eu lieu.
+
 ## [1.4.0] - 2026-08-15
 ### Ajouté
 - **Onglet `Restrictions` : usages restreints et arrêtés préfectoraux** (`Restrictions.gs`). L'outil ne conservait jusqu'ici que le niveau de gravité et jetait le reste de la réponse de l'API. Un niveau seul n'est pas actionnable — « Alerte renforcée » ne dit pas ce qui est interdit sur un site. Chaque usage restreint est désormais restitué avec sa thématique, son texte de restriction, la date de l'arrêté et les liens vers l'arrêté préfectoral et l'arrêté cadre (PDF), ce qui vaut à la fois consigne d'exploitation et pièce justificative en cas de contrôle.

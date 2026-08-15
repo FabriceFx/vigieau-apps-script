@@ -10,6 +10,8 @@ const DICTIONNAIRE = {
     MENU_RAPPORT: "3. Envoyer le rapport des sites en crise",
     MENU_CARTE: "🗺️ Afficher la carte interactive",
     MENU_PLANIF: "⏳ Appliquer les planifications",
+    MENU_SETUP: "🚀 Configurer le classeur",
+    MENU_AIDE: "❓ Comment ça marche",
     MENU_ABOUT: "ℹ️ À propos",
     
     // Alertes et Messages généraux
@@ -92,8 +94,50 @@ const DICTIONNAIRE = {
     BILAN_ERREUR: "site(s) n'ont pas pu être récupérés (voir la colonne État).",
     BILAN_TRANSITIONS: "changement(s) de niveau détecté(s) — une alerte a été envoyée.",
     BILAN_RESTRICTIONS: "usage(s) restreint(s) recensé(s) dans l'onglet Restrictions.",
+    BILAN_INCOMPLET: "site(s) au relevé partiel : une ressource n'a pas répondu, le niveau affiché est une borne inférieure.",
     BILAN_CLOSE: "Fermer le tableau de bord",
     
+
+    // Initialisation.gs
+    SETUP_TITLE: "Classeur configuré 🎉",
+    SETUP_CREATED: "créé",
+    SETUP_KEPT: "déjà présent, conservé tel quel",
+    SETUP_REMOVED: "feuille vide par défaut, supprimée",
+    SETUP_NEXT: "Saisissez vos adresses en colonne B de l'onglet Sites, puis lancez « 1. Calculer les données géographiques ».\n\nLe menu « ❓ Comment ça marche » détaille le fonctionnement complet.",
+    SETUP_ERROR: "Impossible de configurer le classeur : ",
+    SETUP_NOTE_RESSOURCES: "Facultatif. Ressources sur lesquelles le site prélève, séparées par une virgule : AEP (réseau d'eau potable), SOU (souterraine), SUP (superficielle).\nExemple : AEP, SOU\nVide = valeur par défaut de l'onglet Configuration.",
+    SETUP_NOTE_PROFIL: "Facultatif. Profil du site : particulier, entreprise, collectivite ou agriculteur.\nVide = valeur par défaut de l'onglet Configuration.",
+
+    // Aide.html
+    AIDE_TITLE: "Comment fonctionne Vigieau Tracker",
+    AIDE_INTRO: "L'outil relève chaque jour le niveau de restriction d'eau applicable à vos sites, en conserve l'historique et vous alerte dès qu'il change.",
+    AIDE_DEMARRAGE_TITLE: "Démarrer",
+    AIDE_ETAPE1: "Configurer le classeur",
+    AIDE_ETAPE1_DETAIL: "Crée les onglets Sites, BDD, Restrictions et Configuration. À ne faire qu'une fois.",
+    AIDE_ETAPE2: "Saisir les adresses",
+    AIDE_ETAPE2_DETAIL: "Une adresse postale par ligne en colonne B de l'onglet Sites. Les colonnes Ressources et Profil sont facultatives.",
+    AIDE_ETAPE3: "Calculer les données géographiques",
+    AIDE_ETAPE3_DETAIL: "Convertit les adresses en coordonnées GPS. Seules les lignes sans coordonnée valide sont recalculées.",
+    AIDE_ETAPE4: "Récupérer l'état Vigieau",
+    AIDE_ETAPE4_DETAIL: "Interroge l'API pour chaque site, archive les niveaux et met à jour les restrictions en vigueur.",
+    AIDE_ONGLETS_TITLE: "Les onglets",
+    AIDE_ONGLET_SITES: "Le seul que vous remplissez : adresse, et si besoin les ressources prélevées (AEP, SOU, SUP) et le profil du site.",
+    AIDE_ONGLET_BDD: "Journal historique. Chaque synchronisation y ajoute une ligne par site, sans jamais rien effacer.",
+    AIDE_ONGLET_RESTRICTIONS: "Ce qui s'applique aujourd'hui : usages interdits ou limités, avec le lien vers l'arrêté préfectoral. Réécrit à chaque synchronisation.",
+    AIDE_ONGLET_CONFIG: "Profil et ressource par défaut, destinataire des emails, fréquences et heures d'exécution.",
+    AIDE_ALERTES_TITLE: "Les alertes par email",
+    AIDE_ALERTE_TRANSITION: "Changement de niveau",
+    AIDE_ALERTE_TRANSITION_DETAIL: "Envoyée dès qu'un site change de niveau, à l'aggravation comme à la levée. Aucun email si rien ne bouge.",
+    AIDE_ALERTE_CRISE: "Rapport des sites en crise",
+    AIDE_ALERTE_CRISE_DETAIL: "État des lieux des sites au niveau maximal, à la demande ou selon la planification.",
+    AIDE_ENCART_FIABILITE: "Une panne de l'API n'est jamais présentée comme un changement de niveau, et un relevé partiel (une ressource qui n'a pas répondu) est exclu des alertes : le niveau affiché est alors une borne inférieure, signalé comme tel dans le bilan.",
+    AIDE_AUTO_TITLE: "Automatiser",
+    AIDE_AUTO_SAISIE: "Automatisation de saisie",
+    AIDE_AUTO_SAISIE_DETAIL: "Une fois activée, taper une adresse suffit : les coordonnées GPS se calculent seules.",
+    AIDE_AUTO_PLANIF: "Planifications",
+    AIDE_AUTO_PLANIF_DETAIL: "Réglez les fréquences dans l'onglet Configuration puis appliquez-les. Prévoyez l'email au moins une heure après la synchronisation.",
+    AIDE_CLOSE: "Fermer",
+
     // Carte.html
     CARTE_SYNTHESE: "📍 Synthèse des sites",
     CARTE_TOUS: "Tous"
@@ -106,6 +150,8 @@ const DICTIONNAIRE = {
     MENU_RAPPORT: "3. Send crisis sites report",
     MENU_CARTE: "🗺️ Display interactive map",
     MENU_PLANIF: "⏳ Apply schedules",
+    MENU_SETUP: "🚀 Set up the spreadsheet",
+    MENU_AIDE: "❓ How it works",
     MENU_ABOUT: "ℹ️ About",
     
     // Alertes et Messages généraux
@@ -188,8 +234,50 @@ const DICTIONNAIRE = {
     BILAN_ERREUR: "site(s) could not be retrieved (see the Status column).",
     BILAN_TRANSITIONS: "level change(s) detected — an alert has been sent.",
     BILAN_RESTRICTIONS: "restricted use(s) listed in the Restrictions tab.",
+    BILAN_INCOMPLET: "site(s) partially measured: a resource did not respond, the displayed level is a lower bound.",
     BILAN_CLOSE: "Close dashboard",
     
+
+    // Initialisation.gs
+    SETUP_TITLE: "Spreadsheet ready 🎉",
+    SETUP_CREATED: "created",
+    SETUP_KEPT: "already present, left untouched",
+    SETUP_REMOVED: "empty default sheet, removed",
+    SETUP_NEXT: "Enter your addresses in column B of the Sites tab, then run \"1. Calculate geographical data\".\n\nThe \"❓ How it works\" menu explains everything in detail.",
+    SETUP_ERROR: "Unable to set up the spreadsheet: ",
+    SETUP_NOTE_RESSOURCES: "Optional. Resources the site draws from, comma-separated: AEP (mains water), SOU (groundwater), SUP (surface water).\nExample: AEP, SOU\nEmpty = default value from the Configuration tab.",
+    SETUP_NOTE_PROFIL: "Optional. Site profile: particulier, entreprise, collectivite or agriculteur.\nEmpty = default value from the Configuration tab.",
+
+    // Aide.html
+    AIDE_TITLE: "How Vigieau Tracker works",
+    AIDE_INTRO: "The tool checks the water restriction level applying to your sites every day, keeps a history of it and alerts you as soon as it changes.",
+    AIDE_DEMARRAGE_TITLE: "Getting started",
+    AIDE_ETAPE1: "Set up the spreadsheet",
+    AIDE_ETAPE1_DETAIL: "Creates the Sites, BDD, Restrictions and Configuration tabs. Only needed once.",
+    AIDE_ETAPE2: "Enter the addresses",
+    AIDE_ETAPE2_DETAIL: "One postal address per row in column B of the Sites tab. The Resources and Profile columns are optional.",
+    AIDE_ETAPE3: "Calculate geographical data",
+    AIDE_ETAPE3_DETAIL: "Converts addresses into GPS coordinates. Only rows without valid coordinates are recalculated.",
+    AIDE_ETAPE4: "Fetch the Vigieau status",
+    AIDE_ETAPE4_DETAIL: "Queries the API for each site, archives the levels and refreshes the restrictions in force.",
+    AIDE_ONGLETS_TITLE: "The tabs",
+    AIDE_ONGLET_SITES: "The only one you fill in: address, and if needed the resources drawn from (AEP, SOU, SUP) and the site profile.",
+    AIDE_ONGLET_BDD: "History log. Each synchronization appends one row per site and never erases anything.",
+    AIDE_ONGLET_RESTRICTIONS: "What applies today: banned or limited uses, with a link to the prefectoral order. Rewritten at each synchronization.",
+    AIDE_ONGLET_CONFIG: "Default profile and resource, email recipient, frequencies and execution times.",
+    AIDE_ALERTES_TITLE: "Email alerts",
+    AIDE_ALERTE_TRANSITION: "Level change",
+    AIDE_ALERTE_TRANSITION_DETAIL: "Sent as soon as a site changes level, both when restrictions tighten and when they are lifted. No email if nothing moves.",
+    AIDE_ALERTE_CRISE: "Crisis sites report",
+    AIDE_ALERTE_CRISE_DETAIL: "Overview of sites at the maximum level, on demand or on a schedule.",
+    AIDE_ENCART_FIABILITE: "An API outage is never presented as a level change, and a partial reading (a resource that did not respond) is excluded from alerts: the displayed level is then a lower bound, flagged as such in the summary.",
+    AIDE_AUTO_TITLE: "Automating",
+    AIDE_AUTO_SAISIE: "Input automation",
+    AIDE_AUTO_SAISIE_DETAIL: "Once enabled, typing an address is enough: GPS coordinates are calculated on their own.",
+    AIDE_AUTO_PLANIF: "Schedules",
+    AIDE_AUTO_PLANIF_DETAIL: "Set the frequencies in the Configuration tab then apply them. Schedule the email at least one hour after the synchronization.",
+    AIDE_CLOSE: "Close",
+
     // Carte.html
     CARTE_SYNTHESE: "📍 Sites summary",
     CARTE_TOUS: "All"
