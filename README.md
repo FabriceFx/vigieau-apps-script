@@ -3,128 +3,205 @@
 [![Google Apps Script](https://img.shields.io/badge/Google%20Apps%20Script-4285F4?style=for-the-badge&logo=google-apps-script&logoColor=white)](#)
 [![Vigieau API](https://img.shields.io/badge/API-Vigieau-blue?style=for-the-badge)](#)
 [![Leaflet](https://img.shields.io/badge/Leaflet-199900?style=for-the-badge&logo=leaflet&logoColor=white)](#)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=for-the-badge)](https://opensource.org/licenses/MIT)
 
-[🇫🇷 Français](#français) | [🇬🇧 English](#english)
+[🇫🇷 Français](#-français) | [🇬🇧 English](#-english)
 
 ---
 
 ## 🇫🇷 Français
 
-**Vigieau Tracker** est une application complète, 100% hébergée sur **Google Sheets & Google Apps Script**, permettant de suivre automatiquement l'état des restrictions d'eau en France pour une flotte de sites (entreprises, collectivités, exploitations agricoles, etc.).
+### 🎯 Pourquoi Vigieau Tracker ?
 
-L'outil s'interface avec l'API officielle du gouvernement [Vigieau](https://api.vigieau.beta.gouv.fr/) et avec l'API de géocodage [GeoPF](https://data.geopf.fr/geocodage/search).
+Suivre le risque sécheresse sur un parc multi-sites est un casse-tête opérationnel : scruter quotidiennement des dizaines d'arrêtés préfectoraux disparates, décoder des zonages administratifs complexes et risquer une mise en demeure ou une interruption d'activité faute d'avoir réagi à temps lors d'un passage en *Alerte renforcée* ou en *Crise*.
 
-### ✨ Fonctionnalités principales
+**Vigieau Tracker** transforme cette contrainte réglementaire en un **pilote automatique 100% hébergé sur Google Sheets et Google Apps Script** : chaque adresse est géocodée, chaque restriction d'usage est traduite en consigne d'exploitation concrète et chaque arrêté officiel est accessible en un clic.
 
-* 📍 **Géocodage magique** : Saisissez une adresse, le script récupère automatiquement les coordonnées GPS en tâche de fond (via Trigger `onEdit`).
-* 🔄 **Synchronisation Vigieau** : Interrogation en masse de l'API Vigieau pour connaître le niveau d'alerte sécheresse (Vigilance, Alerte, Alerte renforcée, Crise) de chaque site. 
-* 🎨 **Carte interactive premium** : Visualisation HTML/JS (Leaflet) intégrée dans Google Sheets. Design moderne (*Glassmorphism*), filtrage en temps réel et animations CSS (effet pulse radar) sur les sites en crise.
-* 📄 **Usages restreints et arrêtés** : L'onglet **Restrictions** détaille, pour chaque site, ce qui est réellement interdit ou limité (thématique, usage, texte de la restriction), avec la date de l'arrêté préfectoral et les liens vers les PDF de l'arrêté et de l'arrêté cadre. Les usages sont filtrés selon le profil configuré. L'onglet est un instantané réécrit à chaque synchronisation.
-* 🔔 **Alerte sur changement de niveau** : Un email part dès qu'un site change de niveau — à l'aggravation comme à la levée des restrictions —, et uniquement dans ce cas. Les aggravations sont présentées en tête. Une panne de l'API n'est jamais interprétée comme un changement de niveau. Se désactive depuis l'onglet **Configuration** (paramètre `Alerte sur changement`).
-* ✉️ **Rapports automatisés** : Envoi de rapports par email contenant le détail des sites au niveau de restriction maximal (Crise).
-* ⚙️ **Tableau de bord et autonomie** : Configuration dynamique depuis le tableur (choix du profil d'entreprise, paramétrage des heures de vérification). Exécution 100% autonome via les déclencheurs (Triggers) Google.
+L'application s'interface directement avec l'API officielle de l'État [Vigieau](https://api.vigieau.beta.gouv.fr/) et l'API nationale de géocodage [GeoPF (IGN / data.gouv.fr)](https://data.geopf.fr/geocodage/search).
 
-### 🚀 Prérequis et Installation
+---
 
-#### 1. Installation du code
+### ✨ Fonctionnalités clés
 
-**Méthode 1 : Classique (Copier-Coller)**
-Si vous n'êtes pas familier avec les lignes de commande, c'est la méthode la plus simple :
-1. Dans votre Google Sheets, allez dans `Extensions` > `Apps Script`.
-2. Allez dans les paramètres du projet (roue crantée) et cochez **"Afficher le fichier manifeste 'appsscript.json' dans l'éditeur"**.
-3. Dans l'éditeur, copiez-collez le contenu du fichier `appsscript.json` de ce dépôt (ceci configure les autorisations de sécurité nécessaires).
-4. Créez les 10 fichiers de type Script (`.gs`) : `Config.gs`, `Code.gs`, `VigiEau.gs`, `GPS.gs`, `Transitions.gs`, `Restrictions.gs`, `Cato.gs`, `Mail.gs`, `Planification.gs`, `Lang.gs`.
-5. Créez les 2 fichiers de type HTML (`.html`) : `Carte.html`, `Bilan.html`.
-6. Copiez-collez le contenu de chaque fichier de ce répertoire GitHub dans les fichiers correspondants de votre projet.
-7. Sauvegardez (`Ctrl+S`).
+* 📍 **Géocodage haute performance** : 
+  * Saisie intuitive : tapez une adresse dans l'onglet `Sites`, le script calcule automatiquement les coordonnées GPS en arrière-plan via un déclencheur `onEdit`.
+  * Calcul massif : parallélisation par lots via `UrlFetchApp.fetchAll` pour traiter des centaines de sites en quelques secondes sans risque de timeout.
+* 🔄 **Synchronisation & Historique d'archivage (BDD)** :
+  * Relevé automatique des niveaux de gravité (*Vigilance*, *Alerte*, *Alerte renforcée*, *Crise*).
+  * Journal chronologique *append-only* horodaté avec liens Google Maps dynamiques en texte enrichi (indépendants des formats régionaux).
+* 📜 **Instantané des restrictions d'usages & Arrêtés officiels** :
+  * L'onglet **Restrictions** détaille avec précision ce qui est interdit ou restreint (arrosage, lavage, process, remplissage).
+  * Filtrage automatique selon votre profil métier configuré (*Entreprise*, *Collectivité*, *Exploitant agricole*, *Particulier*).
+  * Liens directs vers les documents PDF officiels de l'arrêté préfectoral et de l'arrêté cadre.
+* 🚨 **Détection proactive des transitions de niveau** :
+  * Notification par email envoyée **dès qu'un changement de niveau survient** sur un site (aggravation ou levée de restriction).
+  * Email dynamique Material Design avec en-tête contextuel (rouge en cas d'escalade, vert en cas d'allègement), flèches d'évolution (`↑` / `↓`) et lien direct vers l'arrêté.
+  * Zéro faux positif : les pannes de réseau ou erreurs d'API temporaires sont exclues du différentiel.
+* ✉️ **Rapports de crise planifiés** :
+  * Expédition automatique d'un rapport consolidé listant l'ensemble des sites au niveau maximal de *Crise*.
+* 🗺️ **Carte interactive Leaflet (*Glassmorphism*)** :
+  * Modale plein écran intégrée à Google Sheets avec fond cartographique OpenStreetMap.
+  * Filtrage instantané par niveau de restriction et animations CSS (pulsation radar sur les sites en crise).
+* ⚙️ **Concurrence & Autonomie totale** :
+  * Verrouillage anti-doublons via `LockService`.
+  * Détection préventive des conflits d'horaires entre synchronisation et expédition d'emails (marge de ±15 min des triggers Google).
+  * Bilinguisme natif (Français / Anglais) adaptatif.
 
-**Méthode 2 : Avancée (via Clasp)**
-Vous pouvez importer ce code dans votre projet Google Apps Script en utilisant [clasp](https://github.com/google/clasp) :
+---
+
+### 📂 Organisation du classeur
+
+| Onglet | Rôle | Mode de mise à jour |
+| :--- | :--- | :--- |
+| **`Sites`** | Répertoire de votre flotte (Département, Adresse, Coordonnées GPS). | Manuel / Saisie automatique |
+| **`BDD`** | Journal d'archivage chronologique de toutes les mesures historiques. | Ajout continu (*Append-only*) |
+| **`Restrictions`** | Synthèse des règles d'usages en vigueur aujourd'hui et arrêtés PDF. | Instantané réécrit (*Snapshot*) |
+| **`Configuration`** | Paramètres personnalisables (Profil, Type de zone, Fréquences, Email). | Administrateur |
+
+---
+
+### 🚀 Installation et déploiement
+
+#### Méthode 1 : Déploiement rapide via Clasp (Recommandée)
 ```bash
+# 1. Cloner le projet Apps Script
 clasp clone <VOTRE_SCRIPT_ID>
-# Copiez les fichiers de ce repo, puis :
+
+# 2. Synchroniser les fichiers de ce dépôt
 clasp push
 ```
 
-#### 2. Configuration du tableur
-Le script va automatiquement créer les onglets nécessaires s'ils sont manquants.
-1. Créez un onglet nommé **Sites** avec la structure suivante :
-   * Colonne A : `Département`
-   * Colonne B : `Adresse`
-   * Colonne C : `GPS`
-2. Lancez la fonction `onOpen()` pour faire apparaître le menu personnalisé **📍 Géolocalisation & eau** dans Google Sheets.
-3. Cliquez sur **2. Récupérer l'état Vigieau (Archivage)** une première fois pour que le script génère l'onglet **Configuration**, l'onglet de destination **BDD** et l'onglet **Restrictions** avec leurs en-têtes.
+#### Méthode 2 : Installation manuelle (Copier-Coller)
+1. Dans votre Google Sheets, rendez-vous dans **Extensions** > **Apps Script**.
+2. Dans les paramètres du projet (icône roue dentée), cochez **"Afficher le fichier manifeste 'appsscript.json' dans l'éditeur"**.
+3. Copiez le contenu de `appsscript.json` pour configurer les autorisations de sécurité minimales.
+4. Créez les **10 fichiers Script (`.gs`)** :
+   - `Config.gs`, `Code.gs`, `VigiEau.gs`, `GPS.gs`, `Restrictions.gs`, `Transitions.gs`, `Cato.gs`, `Mail.gs`, `Planification.gs`, `Lang.gs`.
+5. Créez les **2 fichiers HTML (`.html`)** :
+   - `Carte.html`, `Bilan.html`.
+6. Collez-y le code correspondant issu de ce dépôt et enregistrez (`Ctrl + S` / `Cmd + S`).
 
-#### 3. Activer les automatisations
-Depuis le menu personnalisé de Google Sheets :
-* **Automatisation du géocodage :** Cliquez sur `⚡ Activer l'automatisation de saisie`.
-* **Planifications temporelles :** Remplissez l'onglet `Configuration`, puis cliquez sur `⏳ Appliquer les planifications` pour rendre l'outil 100% autonome (synchronisation quotidienne/hebdomadaire).
+---
+
+### 📋 Guide de démarrage rapide
+
+1. Dans votre classeur, créez un onglet nommé **`Sites`** avec en-têtes :
+   - Colonne A : `Département`
+   - Colonne B : `Adresse`
+   - Colonne C : `GPS`
+2. Renseignez vos adresses postales en Colonne B.
+3. Exécutez la fonction `onOpen()` (ou rechargez la page) pour afficher le menu **📍 Géolocalisation & eau**.
+4. Cliquez sur **`1. Calculer les données géographiques`** pour renseigner automatiquement les coordonnées GPS.
+5. Cliquez sur **`2. Récupérer l'état Vigieau (Archivage)`** : le script crée et initialise automatiquement les onglets `Configuration`, `BDD` et `Restrictions`.
+6. Ajustez vos préférences dans l'onglet `Configuration`, puis cliquez sur **`⏳ Appliquer les planifications`** pour rendre le suivi 100% autonome.
 
 ---
 
 ## 🇬🇧 English
 
-**Vigieau Tracker** is a comprehensive application, 100% hosted on **Google Sheets & Google Apps Script**, allowing you to automatically track the status of water restrictions in France for a fleet of sites (companies, communities, agricultural farms, etc.).
+### 🎯 Why Vigieau Tracker?
 
-The tool interfaces with the official government API [Vigieau](https://api.vigieau.beta.gouv.fr/) and with the geocoding API [GeoPF](https://data.geopf.fr/geocodage/search).
+Monitoring drought risk across multiple facilities is an operational burden: sifting through dozens of prefectural decrees, decoding fragmented administrative zoning, and risking regulatory fines or forced operational shutdowns due to delayed responses during *Alert* or *Crisis* escalations.
 
-### ✨ Key Features
+**Vigieau Tracker** turns this regulatory burden into an **automated compliance engine 100% hosted on Google Sheets and Google Apps Script**: every address is geocoded, every usage restriction is translated into actionable operational guidelines, and every legal order is accessible in one click.
 
-* 📍 **Magic Geocoding**: Enter an address, the script automatically retrieves the GPS coordinates in the background (via `onEdit` Trigger).
-* 🔄 **Vigieau Synchronization**: Mass querying of the Vigieau API to find out the drought alert level (Vigilance, Alert, Reinforced Alert, Crisis) of each site.
-* 🎨 **Premium Interactive Map**: HTML/JS visualization (Leaflet) integrated into Google Sheets. Modern design (*Glassmorphism*), real-time filtering and CSS animations (radar pulse effect) on sites in crisis.
-* 📄 **Restricted Uses & Prefectoral Orders**: The **Restrictions** tab details, for each site, what is actually banned or limited (theme, use, restriction text), along with the prefectoral order date and links to the order and framework order PDFs. Uses are filtered according to the configured profile. The tab is a snapshot, rewritten at each synchronization.
-* 🔔 **Level Change Alerts**: An email is sent as soon as a site changes level — both when restrictions tighten and when they are lifted — and only then. Escalations are listed first. An API outage is never interpreted as a level change. Can be disabled from the **Configuration** tab (`Alerte sur changement` parameter).
-* ✉️ **Automated Reports**: Sending reports by email containing the details of the sites at the maximum restriction level (Crisis).
-* ⚙️ **Dashboard and Autonomy**: Dynamic configuration from the spreadsheet (choice of company profile, setting check times). 100% autonomous execution via Google Triggers.
-
-### 🚀 Prerequisites & Installation
-
-#### 1. Code Installation
-
-**Method 1: Classic (Copy-Paste)**
-If you are not familiar with command lines, this is the easiest method:
-1. In your Google Sheets, go to `Extensions` > `Apps Script`.
-2. Go to Project Settings (gear icon) and check **"Show 'appsscript.json' manifest file in editor"**.
-3. In the editor, copy and paste the content of the `appsscript.json` file from this repository (this sets the strict security permissions required).
-4. Create the 10 Script type files (`.gs`): `Config.gs`, `Code.gs`, `VigiEau.gs`, `GPS.gs`, `Transitions.gs`, `Restrictions.gs`, `Cato.gs`, `Mail.gs`, `Planification.gs`, `Lang.gs`.
-5. Create the 2 HTML type files (`.html`): `Carte.html`, `Bilan.html`.
-6. Copy-paste the content of each file from this GitHub repository into the corresponding files of your project.
-7. Save (`Ctrl+S`).
-
-**Method 2: Advanced (via Clasp)**
-You can import this code into your Google Apps Script project using [clasp](https://github.com/google/clasp):
-```bash
-clasp clone <YOUR_SCRIPT_ID>
-# Copy the files from this repo, then:
-clasp push
-```
-
-#### 2. Spreadsheet Configuration
-The script will automatically create the necessary tabs if they are missing.
-1. Create a tab named **Sites** with the following structure:
-   * Column A: `Département`
-   * Column B: `Adresse`
-   * Column C: `GPS`
-2. Run the `onOpen()` function to bring up the custom menu **📍 Geolocation & water** in Google Sheets.
-3. Click on **2. Fetch Vigieau status (Archiving)** for the first time so the script generates the **Configuration** tab, the destination tab **BDD** and the **Restrictions** tab.
-
-#### 3. Enable Automations
-From the custom Google Sheets menu:
-* **Geocoding Automation:** Click on `⚡ Enable input automation`.
-* **Time Schedules:** Fill out the `Configuration` tab, then click on `⏳ Apply schedules` to make the tool 100% autonomous (daily/weekly synchronization).
+The application interfaces directly with the official French Government API [Vigieau](https://api.vigieau.beta.gouv.fr/) and the national geocoding API [GeoPF (IGN / data.gouv.fr)](https://data.geopf.fr/geocodage/search).
 
 ---
 
-## 🛠 Technologies
-* **Backend:** JavaScript (V8 Google Apps Script), CacheService, Installable Triggers.
-* **Frontend:** HTML5, Vanilla CSS, Leaflet.js, Google Apps Script HtmlService.
-* **APIs:** 
-  * `api.vigieau.beta.gouv.fr/api/zones`
-  * `data.geopf.fr/geocodage/search`
+### ✨ Key Features
 
-## 👨‍💻 Author
-Developed by [Fabrice Faucheux](https://faucheux.bzh)
+* 📍 **High-Performance Geocoding**:
+  * Seamless on-the-fly calculation: enter an address in the `Sites` tab, GPS coordinates are calculated in the background via an `onEdit` trigger.
+  * Mass batch processing: parallel execution via `UrlFetchApp.fetchAll` to process hundreds of locations in seconds without timeouts.
+* 🔄 **Synchronization & Immutable Archiving (BDD)**:
+  * Automatic retrieval of drought restriction levels (*Vigilance*, *Alert*, *Reinforced Alert*, *Crisis*).
+  * Chronological *append-only* audit log with locale-agnostic Google Maps rich text links.
+* 📜 **Live Restrictions Snapshot & Official Decrees**:
+  * The **Restrictions** tab outlines exactly what is restricted or prohibited (watering, cleaning, manufacturing, filling).
+  * Filtered by profile (*Company*, *Local Authority*, *Farmer*, *Individual*).
+  * Direct links to official PDF prefectural orders and framework decrees.
+* 🚨 **Proactive Level Transition Alerts**:
+  * Real-time email notifications **as soon as a site's restriction level changes** (tightening or lifting).
+  * Modern Material Design email layout with adaptive styling (crimson for escalations, forest green for easings), directional indicators (`↑` / `↓`), and direct links to decrees.
+  * Zero false positives: network outages or temporary API glitches are filtered out.
+* ✉️ **Scheduled Crisis Reports**:
+  * Automated delivery of consolidated reports listing all facilities currently at maximum *Crisis* level.
+* 🗺️ **Interactive Leaflet Map (*Glassmorphism*)**:
+  * Embedded full-screen modal in Google Sheets powered by OpenStreetMap and Leaflet.js.
+  * Real-time level filtering and CSS radar pulse animations highlighting crisis areas.
+* ⚙️ **Concurrency & Autonomy**:
+  * Concurrency locking powered by `LockService`.
+  * Preventive schedule conflict detection (accounting for Google's ±15 min trigger window).
+  * Full native bilingual support (French / English).
 
-## 📄 License
-This project is open-source and freely modifiable. Data comes from French public services.
+---
+
+### 📂 Spreadsheet Structure
+
+| Sheet | Role | Update Mechanism |
+| :--- | :--- | :--- |
+| **`Sites`** | Directory of your locations (Department, Address, GPS coordinates). | Manual / Automated on-edit |
+| **`BDD`** | Chronological historical audit log of all synchronization runs. | Continuous *Append-only* |
+| **`Restrictions`** | Snapshot of current restricted uses and official PDF decree links. | Replaced *Snapshot* |
+| **`Configuration`** | User-defined parameters (Profile, Zone type, Schedules, Target email). | Administrator |
+
+---
+
+### 🚀 Installation & Setup
+
+#### Method 1: Fast deployment via Clasp (Recommended)
+```bash
+# 1. Clone your Apps Script project
+clasp clone <YOUR_SCRIPT_ID>
+
+# 2. Push repository files
+clasp push
+```
+
+#### Method 2: Manual Installation (Copy & Paste)
+1. In Google Sheets, open **Extensions** > **Apps Script**.
+2. In Project Settings (gear icon), check **"Show 'appsscript.json' manifest file in editor"**.
+3. Paste the contents of `appsscript.json` to configure the required OAuth permissions.
+4. Create the **10 Script files (`.gs`)**:
+   - `Config.gs`, `Code.gs`, `VigiEau.gs`, `GPS.gs`, `Restrictions.gs`, `Transitions.gs`, `Cato.gs`, `Mail.gs`, `Planification.gs`, `Lang.gs`.
+5. Create the **2 HTML files (`.html`)**:
+   - `Carte.html`, `Bilan.html`.
+6. Paste the respective code and save (`Ctrl + S` / `Cmd + S`).
+
+---
+
+### 📋 Quickstart
+
+1. Create a sheet named **`Sites`** with headers:
+   - Column A: `Département`
+   - Column B: `Adresse`
+   - Column C: `GPS`
+2. Add your postal addresses in Column B.
+3. Trigger `onOpen()` (or reload your spreadsheet) to display the **📍 Géolocalisation & eau** menu.
+4. Click **`1. Calculer les données géographiques`** to geocode all addresses.
+5. Click **`2. Récupérer l'état Vigieau (Archivage)`** : the script automatically generates and formats the `Configuration`, `BDD`, and `Restrictions` sheets.
+6. Configure your preferences in `Configuration` and click **`⏳ Appliquer les planifications`** to activate autonomous background tracking.
+
+---
+
+## 🛠 Technologies & Architecture
+
+* **Runtime:** JavaScript V8 Google Apps Script.
+* **Services Google:** `SpreadsheetApp`, `UrlFetchApp` (Batching), `CacheService`, `LockService`, `MailApp`, `HtmlService`.
+* **Frontend:** HTML5, CSS3 Glassmorphism, Leaflet.js, OpenStreetMap.
+* **External APIs:**
+  * Vigieau Zones & Restrictions API (`api.vigieau.beta.gouv.fr/api/zones`)
+  * French National Geocoding API (`data.geopf.fr/geocodage/search`)
+
+---
+
+## 👨‍💻 Auteur / Author
+
+Développé avec passion par **[Fabrice Faucheux](https://faucheux.bzh)**.
+
+---
+
+## 📄 Licence / License
+
+Ce projet est distribué sous licence libre **MIT**. Les données environnementales proviennent des services publics de l'État français.
