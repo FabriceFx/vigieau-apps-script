@@ -77,6 +77,8 @@ const DICTIONNAIRE = {
     TRANSITION_COL_SITE: "Site",
     TRANSITION_COL_AVANT: "Niveau précédent",
     TRANSITION_COL_APRES: "Nouveau niveau",
+    TRANSITION_COL_ARRETE: "Arrêté",
+    TRANSITION_COL_ARRETE_LIEN: "📄 Consulter",
     TRANSITION_NEW_TITLE: "Sites relevés pour la première fois",
     TRANSITION_FOOTER: "Seuls les changements sont signalés : l'absence d'email signifie que les niveaux sont inchangés. Message généré automatiquement par Vigieau Tracker.",
     
@@ -89,6 +91,7 @@ const DICTIONNAIRE = {
     BILAN_NORMAL: "Normal",
     BILAN_ERREUR: "site(s) n'ont pas pu être récupérés (voir la colonne État).",
     BILAN_TRANSITIONS: "changement(s) de niveau détecté(s) — une alerte a été envoyée.",
+    BILAN_RESTRICTIONS: "usage(s) restreint(s) recensé(s) dans l'onglet Restrictions.",
     BILAN_CLOSE: "Fermer le tableau de bord",
     
     // Carte.html
@@ -170,6 +173,8 @@ const DICTIONNAIRE = {
     TRANSITION_COL_SITE: "Site",
     TRANSITION_COL_AVANT: "Previous level",
     TRANSITION_COL_APRES: "New level",
+    TRANSITION_COL_ARRETE: "Order",
+    TRANSITION_COL_ARRETE_LIEN: "📄 View",
     TRANSITION_NEW_TITLE: "Sites recorded for the first time",
     TRANSITION_FOOTER: "Only changes are reported: no email means levels are unchanged. Message generated automatically by Vigieau Tracker.",
     
@@ -182,6 +187,7 @@ const DICTIONNAIRE = {
     BILAN_NORMAL: "Normal",
     BILAN_ERREUR: "site(s) could not be retrieved (see the Status column).",
     BILAN_TRANSITIONS: "level change(s) detected — an alert has been sent.",
+    BILAN_RESTRICTIONS: "restricted use(s) listed in the Restrictions tab.",
     BILAN_CLOSE: "Close dashboard",
     
     // Carte.html
@@ -191,19 +197,36 @@ const DICTIONNAIRE = {
 };
 
 /**
- * Fonction de traduction.
+ * Fonction de traduction centralisée.
+ * Détecte la langue en croisant la locale de l'utilisateur et celle du classeur,
+ * avec priorité absolue au français par défaut.
  * @param {string} cle - La clé de traduction.
  * @returns {string} Le texte traduit.
  */
 function t(cle) {
   let locale = "fr";
+
   try {
-    const userLocale = Session.getActiveUserLocale();
-    if (userLocale && userLocale.startsWith("en")) {
+    let userLocale = "";
+    try {
+      userLocale = (Session.getActiveUserLocale() || "").toLowerCase();
+    } catch (e) {}
+
+    let sheetLocale = "";
+    try {
+      const ss = SpreadsheetApp.getActiveSpreadsheet();
+      if (ss) sheetLocale = (ss.getSpreadsheetLocale() || "").toLowerCase();
+    } catch (e) {}
+
+    // Si l'utilisateur ou le classeur est explicitement en français, on force le français
+    if (userLocale.startsWith("fr") || sheetLocale.startsWith("fr")) {
+      locale = "fr";
+    } else if (userLocale.startsWith("en") && !sheetLocale.startsWith("fr")) {
+      // Uniquement en anglais si l'utilisateur est anglophone et que le classeur n'est pas français
       locale = "en";
     }
   } catch (e) {
-    // Par défaut 'fr' si Session non disponible
+    locale = "fr";
   }
   
   if (DICTIONNAIRE[locale] && DICTIONNAIRE[locale][cle]) {

@@ -392,7 +392,7 @@ function synchroniserVigilanceEau() {
       
       if (coords) {
         // Clé de cache contextualisée par profil et type de zone
-        const cleCache = `vigieau_${coords.lat}_${coords.lon}_${parametresVigieau.profil}_${parametresVigieau.zoneType}`;
+        const cleCache = `${CONFIG_APP.PREFIXE_CACHE}${coords.lat}_${coords.lon}_${parametresVigieau.profil}_${parametresVigieau.zoneType}`;
         sitesExtraits.push({ nomSite: nomSite || "Site Inconnu", lat: coords.lat, lon: coords.lon, cleCache });
       }
     }
@@ -418,10 +418,14 @@ function synchroniserVigilanceEau() {
     // L'état est mémorisé à l'index du site pour que la BDD conserve strictement l'ordre de
     // l'onglet Sites, que la valeur vienne du cache ou de l'API.
     const etatsParSite = new Array(sitesExtraits.length).fill(null);
+    // Usages restreints et arrêté associés, mêmes index : alimentent l'onglet Restrictions.
+    const donneesParSite = new Array(sitesExtraits.length).fill(null);
 
     sitesExtraits.forEach((site, index) => {
-      if (dictionnaireCache[site.cleCache]) {
-        etatsParSite[index] = dictionnaireCache[site.cleCache];
+      const enCache = lireCacheZones(dictionnaireCache[site.cleCache]);
+      if (enCache) {
+        etatsParSite[index] = enCache.etat;
+        donneesParSite[index] = enCache;
         return;
       }
       sitesPourAPI.push({ site, index });
@@ -439,14 +443,17 @@ function synchroniserVigilanceEau() {
       sitesPourAPI.forEach((entree, rang) => {
         const reponse = reponses[rang];
         let etatVigilance = "Erreur d'API";
+        let donneesZones = null;
 
         if (reponse) {
           const code = reponse.getResponseCode();
           if (code === 200) {
             try {
-              etatVigilance = extraireNiveauMax(JSON.parse(reponse.getContentText()));
+              donneesZones = extraireDonneesZones(JSON.parse(reponse.getContentText()), parametresVigieau.profil);
+              etatVigilance = donneesZones.etat;
             } catch (e) {
               etatVigilance = "Réponse API invalide";
+              donneesZones = null;
             }
           } else {
             console.error(`Vigieau HTTP ${code} pour "${entree.site.nomSite}" : ${reponse.getContentText().substring(0, 200)}`);
@@ -457,10 +464,12 @@ function synchroniserVigilanceEau() {
 
         // Seul un état mesuré et fiable est mis en cache
         if (estEtatFiable(etatVigilance)) {
-          cacheASauvegarder[entree.site.cleCache] = etatVigilance;
+          const valeur = ecrireCacheZones(donneesZones || { etat: etatVigilance, zones: [] });
+          if (valeur) cacheASauvegarder[entree.site.cleCache] = valeur;
         }
 
         etatsParSite[entree.index] = etatVigilance;
+        donneesParSite[entree.index] = donneesZones;
       });
 
       if (Object.keys(cacheASauvegarder).length > 0) {
@@ -503,10 +512,20 @@ function synchroniserVigilanceEau() {
       // 4. Alerte sur changement de niveau. Postérieure à l'écriture de la BDD, et
       // isolée dans son propre try : un échec d'envoi ne doit jamais faire perdre
       // les relevés qui viennent d'être archivés.
+      // 4. Instantané des usages restreints. Isolé lui aussi : l'archivage des niveaux
+      // ne doit pas dépendre de la bonne écriture de cet onglet.
+      let nbRestrictions = 0;
+      try {
+        const lignesRestrictions = construireLignesRestrictions(sitesExtraits, donneesParSite, dateFormatee);
+        nbRestrictions = ecrireRestrictions(classeur, lignesRestrictions);
+      } catch (erreurRestrictions) {
+        console.error(`Onglet Restrictions non mis à jour : ${erreurRestrictions.stack}`);
+      }
+
       let nbTransitions = 0;
       if (parametresVigieau.alerteTransition === "Activé") {
         try {
-          const transitions = detecterTransitions(etatsPrecedents, sitesExtraits, etatsParSite);
+          const transitions = detecterTransitions(etatsPrecedents, sitesExtraits, etatsParSite, donneesParSite);
           nbTransitions = transitions.changements.length + transitions.nouveaux.length;
 
           if (nbTransitions > 0) {
@@ -526,6 +545,7 @@ function synchroniserVigilanceEau() {
         template.nbNormal = statsBilan.normal;
         template.nbErreur = statsBilan.erreur;
         template.nbTransitions = nbTransitions;
+        template.nbRestrictions = nbRestrictions;
 
         const pageHtml = template.evaluate()
           .setWidth(CONFIG_APP.FENETRE_BILAN.LARGEUR)

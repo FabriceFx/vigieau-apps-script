@@ -2,6 +2,20 @@
 
 Toutes les modifications notables de ce projet seront documentées dans ce fichier.
 
+## [1.4.0] - 2026-08-15
+### Ajouté
+- **Onglet `Restrictions` : usages restreints et arrêtés préfectoraux** (`Restrictions.gs`). L'outil ne conservait jusqu'ici que le niveau de gravité et jetait le reste de la réponse de l'API. Un niveau seul n'est pas actionnable — « Alerte renforcée » ne dit pas ce qui est interdit sur un site. Chaque usage restreint est désormais restitué avec sa thématique, son texte de restriction, la date de l'arrêté et les liens vers l'arrêté préfectoral et l'arrêté cadre (PDF), ce qui vaut à la fois consigne d'exploitation et pièce justificative en cas de contrôle.
+  - Les usages sont filtrés selon le profil configuré, via l'indicateur porté par l'API (`concerneEntreprise`, `concerneParticulier`, `concerneCollectivite`, `concerneExploitation`). Un profil inconnu retombe sur `entreprise` plutôt que de masquer toutes les restrictions.
+  - L'onglet est un **instantané réécrit à chaque synchronisation**, et non un journal : conserver les relevés passés ferait croire à des restrictions encore en vigueur alors qu'elles ont pu être levées. L'historique des niveaux reste dans la BDD.
+  - Les liens sont posés en texte enrichi et seules les URL `http(s)` deviennent cliquables : une valeur inattendue renvoyée par le service ne peut pas devenir un lien dans le classeur.
+  - Écriture plafonnée à `MAX_LIGNES_RESTRICTIONS`, avec journalisation en cas de troncature — jamais silencieuse.
+- **Lien vers l'arrêté dans l'alerte de changement** : chaque site en transition porte un lien direct vers l'arrêté qui fonde la restriction. La colonne n'apparaît que si au moins un lien est disponible.
+- Le bilan de synchronisation indique le nombre d'usages restreints recensés (clé `BILAN_RESTRICTIONS`).
+
+### Modifié
+- **Le cache mémorise l'objet complet** (niveau + usages + arrêté) au lieu du seul libellé, si bien qu'un site servi par le cache alimente l'onglet `Restrictions` comme un site fraîchement interrogé. Le préfixe des clés est versionné (`vigieau2_`) pour que les entrées de l'ancien format ne soient jamais relues. Mesure sur données réelles : 4,3 Ko par site, très en deçà de la limite de 100 Ko par clé ; au-delà de `TAILLE_MAX_CACHE_OCTETS`, seul le niveau est mémorisé.
+- L'écriture de l'onglet `Restrictions` est isolée dans son propre `try` : son échec ne peut pas compromettre l'archivage des niveaux dans la BDD.
+
 ## [1.3.0] - 2026-08-15
 ### Ajouté
 - **Alerte sur changement de niveau** (`Transitions.gs`) : un email est expédié dès qu'un site change de niveau de restriction, et uniquement dans ce cas. L'alerte couvre les aggravations (prévenir dès `Alerte renforcée` plutôt qu'une fois la crise installée) comme les levées de restriction (qui conditionnent la reprise des usages). La détection compare l'état mesuré au dernier état archivé dans la BDD : aucun appel supplémentaire à l'API n'est nécessaire.

@@ -9,7 +9,8 @@ const CONFIG_APP = {
   ONGLETS: {
     SITES: "Sites",
     BDD: "BDD",
-    CONFIG: "Configuration"
+    CONFIG: "Configuration",
+    RESTRICTIONS: "Restrictions"
   },
 
   // Index des colonnes (1-based, standard Google Apps Script getRange)
@@ -32,6 +33,31 @@ const CONFIG_APP = {
   COLONNES_CONFIG: {
     PARAMETRE: 1,   // Colonne A : Nom du paramètre
     VALEUR: 2       // Colonne B : Valeur
+  },
+
+  // Onglet Restrictions : instantané des usages restreints en vigueur.
+  // Contrairement à la BDD (journal historique), cet onglet est réécrit à chaque
+  // synchronisation — ce qui compte est ce qui s'applique aujourd'hui.
+  COLONNES_RESTRICTIONS: {
+    DATE: 1,         // Colonne A : Horodatage de la synchronisation
+    SITE: 2,         // Colonne B : Nom du site
+    NIVEAU: 3,       // Colonne C : Niveau de gravité de la zone
+    ZONE: 4,         // Colonne D : Nom et type de la zone réglementaire
+    THEMATIQUE: 5,   // Colonne E : Thématique de l'usage
+    USAGE: 6,        // Colonne F : Usage concerné
+    RESTRICTION: 7,  // Colonne G : Texte de la restriction
+    ARRETE_DATE: 8,  // Colonne H : Date de début de validité de l'arrêté
+    ARRETE: 9,       // Colonne I : Lien vers l'arrêté préfectoral (PDF)
+    ARRETE_CADRE: 10 // Colonne J : Lien vers l'arrêté cadre (PDF)
+  },
+
+  // Correspondance entre le profil configuré et l'indicateur porté par chaque usage
+  // dans la réponse de l'API : c'est lui qui détermine si la restriction s'applique.
+  PROFIL_VERS_CHAMP: {
+    particulier: "concerneParticulier",
+    entreprise: "concerneEntreprise",
+    collectivite: "concerneCollectivite",
+    agriculteur: "concerneExploitation"
   },
 
   // URLs des services et APIs
@@ -58,9 +84,19 @@ const CONFIG_APP = {
   // synchronisation d'un classeur sous des lignes sans intérêt.
   SEUIL_NOUVEAU_SITE_POIDS: 2,
 
+  // Le cache mémorise désormais l'objet complet (niveau + usages + arrêté) et non plus
+  // le seul libellé : le préfixe est versionné pour que les entrées de l'ancien format
+  // ne soient jamais relues.
+  PREFIXE_CACHE: "vigieau2_",
+  TAILLE_MAX_CACHE_OCTETS: 90000,   // Marge sous la limite de 100 Ko par clé
+  MAX_LIGNES_RESTRICTIONS: 20000,   // Plafond d'écriture de l'onglet Restrictions
+
   // Constantes métier
   ETAT_CRISE: "Crise",
   LIBELLE_LIEN_MAPS: "📍 Voir sur Maps",
+  LIBELLE_LIEN_ARRETE: "📄 Arrêté",
+  LIBELLE_LIEN_ARRETE_CADRE: "📄 Arrêté cadre",
+  LIBELLE_SANS_LIEN: "—",
   LIGNE_DEPART_DONNEES: 2,
 
   // Dimensions UI

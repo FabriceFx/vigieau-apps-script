@@ -56,11 +56,13 @@ const construireEtatsPrecedents = (feuilleSuivi) => {
  * @param {Map<string, string>} etatsPrecedents - Sortie de construireEtatsPrecedents.
  * @param {Array<Object>} sitesExtraits - Sites traités lors de cette synchronisation.
  * @param {Array<string>} etatsParSite - États mesurés, indexés comme sitesExtraits.
+ * @param {Array<Object>} [donneesParSite] - Zones et arrêtés, mêmes index. Facultatif.
  * @returns {{changements: Array<Object>, nouveaux: Array<Object>}} Transitions détectées.
  */
-const detecterTransitions = (etatsPrecedents, sitesExtraits, etatsParSite) => {
+const detecterTransitions = (etatsPrecedents, sitesExtraits, etatsParSite, donneesParSite) => {
   const changements = [];
   const nouveaux = [];
+  const zones = donneesParSite || [];
 
   sitesExtraits.forEach((site, index) => {
     const apres = etatsParSite[index];
@@ -89,7 +91,10 @@ const detecterTransitions = (etatsPrecedents, sitesExtraits, etatsParSite) => {
       avant: avant,
       apres: apres,
       poidsApres: poidsApres,
-      escalade: poidsApres > poidsDeLEtat(avant)
+      escalade: poidsApres > poidsDeLEtat(avant),
+      // Le lien vers l'arrêté rend l'alerte immédiatement exploitable : le
+      // destinataire accède au texte qui fonde la restriction sans rien chercher.
+      arreteUrl: arreteDeReference(zones[index])
     });
   });
 
@@ -121,12 +126,22 @@ const genererHtmlTransitions = (transitions) => {
 
   const styleCellule = "padding: 12px; border-bottom: 1px solid #dadce0; font-size: 14px;";
 
+  // La colonne des arrêtés n'apparaît que si au moins un lien est disponible.
+  const avecArrete = transitions.changements.some(c => estUrlSure(c.arreteUrl));
+
+  const celluleArrete = (c) => {
+    if (!avecArrete) return "";
+    if (!estUrlSure(c.arreteUrl)) return `<td style="${styleCellule}"></td>`;
+    return `<td style="${styleCellule}"><a href="${echapperHtml(c.arreteUrl)}" style="color: #1a73e8; text-decoration: none; font-weight: 600;">${t("TRANSITION_COL_ARRETE_LIEN")}</a></td>`;
+  };
+
   const lignesChangements = transitions.changements.map(c => `
     <tr>
       <td style="${styleCellule} color: #3c4043; font-weight: 500;">${echapperHtml(c.nom)}</td>
       <td style="${styleCellule} color: ${couleurNiveau(c.avant)};">${echapperHtml(c.avant)}</td>
       <td style="${styleCellule} color: #5f6368; text-align: center; font-weight: 700;">${c.escalade ? "↑" : "↓"}</td>
       <td style="${styleCellule} color: ${couleurNiveau(c.apres)}; font-weight: 700;">${echapperHtml(c.apres)}</td>
+      ${celluleArrete(c)}
     </tr>
   `).join("");
 
@@ -138,6 +153,7 @@ const genererHtmlTransitions = (transitions) => {
           <th style="text-align: left; padding: 12px; color: #5f6368; font-weight: 500; font-size: 13px; border-bottom: 2px solid #dadce0;">${t("TRANSITION_COL_AVANT")}</th>
           <th style="width: 32px; border-bottom: 2px solid #dadce0;"></th>
           <th style="text-align: left; padding: 12px; color: #5f6368; font-weight: 500; font-size: 13px; border-bottom: 2px solid #dadce0;">${t("TRANSITION_COL_APRES")}</th>
+          ${avecArrete ? `<th style="text-align: left; padding: 12px; color: #5f6368; font-weight: 500; font-size: 13px; border-bottom: 2px solid #dadce0;">${t("TRANSITION_COL_ARRETE")}</th>` : ""}
         </tr>
       </thead>
       <tbody>${lignesChangements}</tbody>
