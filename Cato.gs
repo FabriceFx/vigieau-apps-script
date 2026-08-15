@@ -1,25 +1,11 @@
 /**
- * Configuration de la cartographie.
- * @constant {Object}
+ * Module de cartographie interactive des restrictions d'eau.
  */
-const CONFIG_CARTO = {
-  ONGLET_SITES: "Sites",
-  ONGLET_SUIVI: "BDD",
-  LARGEUR: 1000,
-  HAUTEUR: 700,
-  
-  // Mapping exact des colonnes (Attention: dans un tableau JS, l'index 0 = Colonne A)
-  INDEX_SITE_SITES: 1, // Colonne B : Adresse postale (sert de nom de site)
-  INDEX_GPS_SITES: 2,  // Colonne C : Code GPS
-  
-  INDEX_SITE_SUIVI: 1, // Colonne B : Site
-  INDEX_ETAT_SUIVI: 2  // Colonne C : Etat de vigilance
-};
 
 /**
- * Échappe les caractères spéciaux HTML
- * @param {string} str - La chaîne à échapper
- * @returns {string} La chaîne échappée
+ * Échappe les caractères spéciaux HTML.
+ * @param {string} str - La chaîne à échapper.
+ * @returns {string} La chaîne échappée.
  */
 function echapperHtml(str) {
   if (typeof str !== 'string') return str;
@@ -36,49 +22,78 @@ function echapperHtml(str) {
 
 /**
  * Prépare les données en croisant les coordonnées GPS et le dernier état connu.
+ * Borde la lecture de la BDD pour éviter la saturation de mémoire sur les gros historiques.
  * @returns {Array<Object>} Tableau d'objets contenant les infos de chaque point.
  */
 const preparerDonneesCarte = () => {
   const classeur = SpreadsheetApp.getActiveSpreadsheet();
-  const feuilleSites = classeur.getSheetByName(CONFIG_CARTO.ONGLET_SITES);
-  const feuilleSuivi = classeur.getSheetByName(CONFIG_CARTO.ONGLET_SUIVI);
+  const feuilleSites = classeur.getSheetByName(CONFIG_APP.ONGLETS.SITES);
+  const feuilleSuivi = classeur.getSheetByName(CONFIG_APP.ONGLETS.BDD);
   
   if (!feuilleSites || !feuilleSuivi) {
     throw new Error("Onglets sources introuvables pour générer la carte.");
   }
-  
-  // 1. Récupération du dernier état de chaque site dans "BDD Suivi"
-  const donneesSuivi = feuilleSuivi.getDataRange().getValues();
+
   const dernierEtatParSite = new Map();
-  
-  // Parcours inversé pour capter la dernière mise à jour chronologique
-  for (let i = donneesSuivi.length - 1; i > 0; i--) {
-    const nomSite = donneesSuivi[i][CONFIG_CARTO.INDEX_SITE_SUIVI]; 
-    const etat = donneesSuivi[i][CONFIG_CARTO.INDEX_ETAT_SUIVI];    
-    
-    if (nomSite && !dernierEtatParSite.has(nomSite)) {
-      dernierEtatParSite.set(nomSite, etat);
+  const derniereLigneSuivi = feuilleSuivi.getLastRow();
+
+  // 1. Récupération du dernier état de chaque site dans "BDD" (lecture bornée aux N dernières lignes)
+  if (derniereLigneSuivi >= CONFIG_APP.LIGNE_DEPART_DONNEES) {
+    const nbLignesDisponibles = derniereLigneSuivi - CONFIG_APP.LIGNE_DEPART_DONNEES + 1;
+    const nbLignesALire = Math.min(nbLignesDisponibles, CONFIG_APP.MAX_LIGNES_HISTORIQUE_LECTURE);
+    const premiereLigneALire = derniereLigneSuivi - nbLignesALire + 1;
+
+    const colSite = CONFIG_APP.COLONNES_BDD.SITE;
+    const colEtat = CONFIG_APP.COLONNES_BDD.ETAT;
+    const maxColBdd = Math.max(colSite, colEtat);
+
+    const donneesSuivi = feuilleSuivi.getRange(premiereLigneALire, 1, nbLignesALire, maxColBdd).getValues();
+
+    // Parcours inversé pour capter le statut le plus récent
+    for (let i = donneesSuivi.length - 1; i >= 0; i--) {
+      const nomSite = donneesSuivi[i][colSite - 1];
+      const etat = donneesSuivi[i][colEtat - 1];
+
+      if (nomSite && !dernierEtatParSite.has(nomSite)) {
+        dernierEtatParSite.set(nomSite, etat);
+      }
     }
   }
   
   // 2. Croisement avec les coordonnées GPS dans "Sites"
-  const donneesSites = feuilleSites.getDataRange().getValues();
+  const derniereLigneSites = feuilleSites.getLastRow();
+  if (derniereLigneSites < CONFIG_APP.LIGNE_DEPART_DONNEES) {
+    return [];
+  }
+
+  const colSiteSites = CONFIG_APP.COLONNES_SITES.ADRESSE;
+  const colGpsSites = CONFIG_APP.COLONNES_SITES.GPS;
+  const maxColSites = Math.max(colSiteSites, colGpsSites);
+
+  const donneesSites = feuilleSites.getRange(
+    CONFIG_APP.LIGNE_DEPART_DONNEES, 
+    1, 
+    derniereLigneSites - CONFIG_APP.LIGNE_DEPART_DONNEES + 1, 
+    maxColSites
+  ).getValues();
+
   const pointsCarte = [];
   
-  for (let i = 1; i < donneesSites.length; i++) {
-    const nomSite = donneesSites[i][CONFIG_CARTO.INDEX_SITE_SITES]; 
-    const gps = donneesSites[i][CONFIG_CARTO.INDEX_GPS_SITES];     
+  for (const ligne of donneesSites) {
+    const nomSite = ligne[colSiteSites - 1];
+    const gpsBrut = ligne[colGpsSites - 1];
+    const coords = parserCoordonnees(gpsBrut);
     
-    // Validation stricte des données
-    if (nomSite && gps && typeof gps === 'string' && gps.includes(",")) {
-      const [lat, lon] = gps.split(",");
-      const etat = dernierEtatParSite.get(nomSite) || "Pas de restriction"; // État par défaut si non trouvé
+    // Validation stricte via l'utilitaire centralisé
+    if (nomSite && coords) {
+      // Par défaut "Inconnu" pour éviter les faux négatifs si un site n'a pas encore de relevé récent
+      const etat = dernierEtatParSite.get(nomSite) || "Inconnu";
       
       pointsCarte.push({
-        nom: echapperHtml(nomSite),
-        lat: parseFloat(lat),
-        lon: parseFloat(lon),
-        etat: echapperHtml(etat)
+        nom: echapperHtml(nomSite.toString()),
+        lat: coords.lat,
+        lon: coords.lon,
+        etat: echapperHtml(etat.toString())
       });
     }
   }
@@ -88,7 +103,6 @@ const preparerDonneesCarte = () => {
 
 /**
  * Génère et affiche la fenêtre modale contenant la carte interactive.
- * Portée : Globale (appelée par le menu personnalisé)
  */
 function afficherCarteVigilance() {
   const interfaceUtilisateur = SpreadsheetApp.getUi();
@@ -105,18 +119,14 @@ function afficherCarteVigilance() {
       return;
     }
     
-    // Création du template HTML à partir du fichier nommé "Carte.html"
     const template = HtmlService.createTemplateFromFile("Carte");
-    
-    // Injection des données JSON sécurisées dans le template
     template.donneesCarto = JSON.stringify(donnees);
     
     const pageHtml = template.evaluate()
-      .setWidth(CONFIG_CARTO.LARGEUR)
-      .setHeight(CONFIG_CARTO.HAUTEUR)
+      .setWidth(CONFIG_APP.FENETRE_CARTE.LARGEUR)
+      .setHeight(CONFIG_APP.FENETRE_CARTE.HAUTEUR)
       .setTitle(t("MODAL_MAP_TITLE"));
       
-    // Affichage de la boîte de dialogue modale
     interfaceUtilisateur.showModalDialog(pageHtml, t("MODAL_MAP_TITLE"));
     
   } catch (erreur) {

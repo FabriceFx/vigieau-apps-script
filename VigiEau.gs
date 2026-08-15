@@ -1,34 +1,6 @@
 /**
- * Configuration spécifique pour l'API Vigieau et l'onglet de suivi.
- * @constant {Object}
+ * Module principal d'interrogation de l'API Vigieau et de synchronisation des restrictions d'eau.
  */
-const CONFIG_VIGIEAU = {
-  ONGLET_SITES: "Sites",
-  COLONNE_NOM_SITE: 2,
-  COLONNE_GPS: 3,
-  LIGNE_DEPART_SITES: 2,
-  
-  ONGLET_SUIVI: "BDD",
-  ONGLET_CONFIG: "Configuration", // Nouvel onglet pour les réglages utilisateurs
-  URL_API: "https://api.vigieau.beta.gouv.fr/api/zones",
-  SEPARATEUR_GPS: ",",
-  
-  // Paramètres de cache et robustesse
-  CACHE_DUREE_SECONDES: 21600, // Durée du cache (6 heures)
-  MAX_RETRIES: 2,              // Nombre de relances en cas d'erreur de l'API
-  
-  // Couleurs de fond pour le formatage automatique de la BDD
-  COULEURS_FOND: {
-    "Crise": "#fce8e6",
-    "Alerte renforcée": "#fef7e0",
-    "Alerte": "#fff9e6",
-    "Vigilance": "#e8f0fe",
-    "Pas de restriction": "#e6f4ea",
-    "Inconnu": "#f1f3f4",
-    "Erreur d'API": "#f1f3f4",
-    "Réponse API invalide": "#f1f3f4"
-  }
-};
 
 /**
  * Hiérarchie des niveaux de gravité
@@ -57,15 +29,23 @@ const obtenirSemaineISO = (date) => {
 const obtenirNomMois = (date) => MOIS_FRANCAIS[date.getMonth()];
 
 const extraireNiveauMax = (zones) => {
-  if (!zones || !Array.isArray(zones) || zones.length === 0) {
+  // Un corps de réponse inattendu ne doit JAMAIS être interprété comme une absence
+  // de restriction : on renvoie explicitement une erreur, qui ne sera pas mise en cache.
+  if (!Array.isArray(zones)) {
+    console.warn("Réponse Vigieau inattendue (tableau attendu) : " + JSON.stringify(zones));
+    return "Réponse API invalide";
+  }
+
+  // Un tableau vide signifie réellement "aucune zone de restriction sur ce point".
+  if (zones.length === 0) {
     return NIVEAUX_GRAVITE["normal"].label;
   }
-  
+
   let poidsMax = -1;
   let labelMax = "Inconnu";
-  
+
   zones.forEach(zone => {
-    const gravite = zone.niveauGravite;
+    const gravite = zone && zone.niveauGravite;
     if (gravite && NIVEAUX_GRAVITE[gravite]) {
       if (NIVEAUX_GRAVITE[gravite].poids > poidsMax) {
         poidsMax = NIVEAUX_GRAVITE[gravite].poids;
@@ -73,15 +53,46 @@ const extraireNiveauMax = (zones) => {
       }
     }
   });
-  
+
+  // Aucun niveau reconnu alors que des zones existent : l'API a probablement évolué.
+  if (poidsMax === -1) {
+    console.warn("Aucun niveau de gravité reconnu dans la réponse Vigieau : " + JSON.stringify(zones));
+  }
+
   return labelMax;
 };
 
+/**
+ * Retrouve le poids de gravité associé à un libellé d'état.
+ * @param {*} label - Libellé tel qu'écrit dans la BDD (ex : "Alerte renforcée").
+ * @returns {number} Le poids (0 à 4), ou -1 si le libellé n'est pas un niveau réel.
+ */
+const poidsDeLEtat = (label) => {
+  const cle = Object.keys(NIVEAUX_GRAVITE).find(k => NIVEAUX_GRAVITE[k].label === label);
+  return cle ? NIVEAUX_GRAVITE[cle].poids : -1;
+};
+
+/**
+ * Vrai uniquement pour les états issus d'une réponse exploitable de l'API.
+ * Les états d'erreur ne doivent être ni mis en cache, ni comptabilisés comme un niveau,
+ * ni comparés à un état antérieur pour en déduire une transition.
+ */
+const estEtatFiable = (etat) => poidsDeLEtat(etat) >= 0;
+
+/**
+ * Exécute un lot de requêtes HTTP avec retries et backoff exponentiel.
+ * Relance sur 429 (rate-limit), 408 (timeout) et 5xx (serveur).
+ * @param {Array<Object>} requetes - Tableau de requêtes pour UrlFetchApp.fetchAll.
+ * @param {number} maxRetries - Nombre maximum de tentatives.
+ * @returns {Array<HTTPResponse|null>} Réponses associées à chaque index d'origine.
+ */
 const executerRequetesAvecRetry = (requetes, maxRetries) => {
   let tentatives = 0;
   let requetesEnCours = requetes.map((req, index) => ({ requeteOriginale: req, indexOriginal: index }));
-  const reponsesFinales = new Array(requetes.length);
-  
+  // fill(null) est indispensable : un tableau creux ferait sauter les indices manquants
+  // à forEach/map côté appelant, faisant disparaître des sites silencieusement.
+  const reponsesFinales = new Array(requetes.length).fill(null);
+
   while (requetesEnCours.length > 0 && tentatives <= maxRetries) {
     const requetesAExecuter = requetesEnCours.map(r => r.requeteOriginale);
     let reponsesPartielles = [];
@@ -89,17 +100,20 @@ const executerRequetesAvecRetry = (requetes, maxRetries) => {
     try {
       reponsesPartielles = UrlFetchApp.fetchAll(requetesAExecuter);
     } catch (e) {
-      console.error("Erreur réseau:", e);
+      console.error(`Erreur réseau fetchAll (tentative ${tentatives + 1}/${maxRetries + 1}) : ${e.message}`);
       break; 
     }
     
     const requetesEchouees = [];
     
     reponsesPartielles.forEach((reponse, i) => {
-      const code = reponse?.getResponseCode() || 500;
+      const code = reponse ? reponse.getResponseCode() : 500;
       const meta = requetesEnCours[i];
       
-      if (code === 200 || (code >= 400 && code < 500)) {
+      // 429 (Too Many Requests), 408 (Request Timeout) et 5xx (Serveur) doivent être relancées avec backoff
+      const estErreurTemporaire = code === 429 || code === 408 || code >= 500;
+
+      if (!estErreurTemporaire && reponse !== null) {
          reponsesFinales[meta.indexOriginal] = reponse;
       } else {
          if (tentatives < maxRetries) {
@@ -113,7 +127,7 @@ const executerRequetesAvecRetry = (requetes, maxRetries) => {
     requetesEnCours = requetesEchouees;
     if (requetesEnCours.length > 0) {
        tentatives++;
-       Utilities.sleep(1000 * tentatives); 
+       Utilities.sleep(CONFIG_APP.DELAI_RETRY_MS * Math.pow(2, tentatives - 1)); 
     }
   }
   
@@ -122,20 +136,92 @@ const executerRequetesAvecRetry = (requetes, maxRetries) => {
 
 const comptabiliserStatistiques = (etatVigilance, statsBilan) => {
   if (etatVigilance === "Crise") statsBilan.crise++;
-  else if (etatVigilance.includes("Alerte")) statsBilan.alerte++;
+  else if (etatVigilance === "Alerte renforcée" || etatVigilance === "Alerte") statsBilan.alerte++;
   else if (etatVigilance === "Vigilance") statsBilan.vigilance++;
   else if (etatVigilance === "Pas de restriction") statsBilan.normal++;
+  else statsBilan.erreur++; // Inconnu, erreur d'API, réponse invalide : jamais silencieux
+};
+
+/**
+ * Initialise l'onglet BDD avec ses en-têtes et son formatage si nécessaire.
+ * @param {SpreadsheetApp.Spreadsheet} classeur - Le classeur actif.
+ * @returns {SpreadsheetApp.Sheet} La feuille BDD prête à l'emploi.
+ */
+const initialiserFeuilleBdd = (classeur) => {
+  let feuilleBdd = classeur.getSheetByName(CONFIG_APP.ONGLETS.BDD);
+  
+  if (!feuilleBdd) {
+    feuilleBdd = classeur.insertSheet(CONFIG_APP.ONGLETS.BDD);
+  }
+
+  if (feuilleBdd.getLastRow() === 0) {
+    const enTetes = [["Date", "Nom du site", "État de vigilance", "Semaine", "Jour", "Mois", "Carte"]];
+    const plageEnTetes = feuilleBdd.getRange(1, 1, 1, 7);
+    plageEnTetes.setValues(enTetes)
+      .setFontWeight("bold")
+      .setFontColor("#ffffff")
+      .setBackground("#1a73e8")
+      .setHorizontalAlignment("center");
+    
+    feuilleBdd.setFrozenRows(1);
+    feuilleBdd.setColumnWidth(1, 160); // Date
+    feuilleBdd.setColumnWidth(2, 240); // Site
+    feuilleBdd.setColumnWidth(3, 160); // État
+    feuilleBdd.setColumnWidth(4, 90);  // Semaine
+    feuilleBdd.setColumnWidth(5, 70);  // Jour
+    feuilleBdd.setColumnWidth(6, 100); // Mois
+    feuilleBdd.setColumnWidth(7, 140); // Carte
+  }
+
+  return feuilleBdd;
+};
+
+/**
+ * Ajoute un paramètre à l'onglet Configuration s'il n'y figure pas encore.
+ * Permet d'introduire une option sans que les classeurs existants restent bloqués
+ * sur la valeur par défaut, sans possibilité de la changer depuis l'interface.
+ * @param {SpreadsheetApp.Sheet} feuilleConfig - L'onglet de configuration.
+ * @param {string} libelle - Nom du paramètre en colonne A.
+ * @param {string} valeurDefaut - Valeur inscrite en colonne B.
+ * @param {string} description - Aide affichée en colonne C.
+ * @param {Array<string>} [valeursListe] - Liste déroulante éventuelle.
+ */
+const assurerParametreConfig = (feuilleConfig, libelle, valeurDefaut, description, valeursListe) => {
+  const colParametre = CONFIG_APP.COLONNES_CONFIG.PARAMETRE;
+  const colValeur = CONFIG_APP.COLONNES_CONFIG.VALEUR;
+  const derniereLigne = feuilleConfig.getLastRow();
+  const recherche = libelle.trim().toLowerCase();
+
+  if (derniereLigne >= CONFIG_APP.LIGNE_DEPART_DONNEES) {
+    const libelles = feuilleConfig
+      .getRange(CONFIG_APP.LIGNE_DEPART_DONNEES, colParametre, derniereLigne - CONFIG_APP.LIGNE_DEPART_DONNEES + 1, 1)
+      .getValues();
+    if (libelles.some(([valeur]) => valeur && valeur.toString().trim().toLowerCase() === recherche)) return;
+  }
+
+  const ligneCible = Math.max(derniereLigne, 1) + 1;
+  feuilleConfig.getRange(ligneCible, 1, 1, 3).setValues([[libelle, valeurDefaut, description]]);
+
+  if (valeursListe) {
+    feuilleConfig.getRange(ligneCible, colValeur).setDataValidation(
+      SpreadsheetApp.newDataValidation().requireValueInList(valeursListe, true).build()
+    );
+  }
+
+  console.warn(`Configuration : paramètre "${libelle}" ajouté avec la valeur "${valeurDefaut}".`);
 };
 
 /**
  * Gère la configuration utilisateur directement depuis le tableur Google Sheets
+ * @param {SpreadsheetApp.Spreadsheet} classeur - Le classeur actif.
+ * @returns {Object} La configuration active.
  */
 const recupererConfigurationUtilisateur = (classeur) => {
-  let feuilleConfig = classeur.getSheetByName(CONFIG_VIGIEAU.ONGLET_CONFIG);
+  let feuilleConfig = classeur.getSheetByName(CONFIG_APP.ONGLETS.CONFIG);
   
   // Si l'onglet de configuration n'existe pas, on le crée avec les valeurs par défaut
   if (!feuilleConfig) {
-    feuilleConfig = classeur.insertSheet(CONFIG_VIGIEAU.ONGLET_CONFIG);
+    feuilleConfig = classeur.insertSheet(CONFIG_APP.ONGLETS.CONFIG);
     
     const enTetes = [["Paramètre", "Valeur", "Description"]];
     const donnees = [
@@ -145,13 +231,14 @@ const recupererConfigurationUtilisateur = (classeur) => {
       ["Fréquence Synchronisation", "Désactivé", "Options : Désactivé, Quotidien, Hebdomadaire"],
       ["Heure Synchronisation", "08", "Heure de 00 à 23"],
       ["Fréquence Email", "Désactivé", "Options : Désactivé, Quotidien, Hebdomadaire"],
-      ["Heure Email", "09", "Heure de 00 à 23"]
+      ["Heure Email", "09", "Heure de 00 à 23"],
+      ["Alerte sur changement", "Activé", "Options : Activé, Désactivé — email dès qu'un site change de niveau"]
     ];
-    
+
     const plageEnTetes = feuilleConfig.getRange("A1:C1");
     plageEnTetes.setValues(enTetes).setFontWeight("bold").setBackground("#f3f3f3");
-    
-    feuilleConfig.getRange("A2:C8").setValues(donnees);
+
+    feuilleConfig.getRange("A2:C9").setValues(donnees);
     feuilleConfig.autoResizeColumns(1, 3);
     
     // Ajout des listes déroulantes (Data Validation)
@@ -169,27 +256,85 @@ const recupererConfigurationUtilisateur = (classeur) => {
     const regleHeures = SpreadsheetApp.newDataValidation().requireValueInList(heures, true).build();
     feuilleConfig.getRange("B6").setDataValidation(regleHeures);
     feuilleConfig.getRange("B8").setDataValidation(regleHeures);
+
+    const regleActivation = SpreadsheetApp.newDataValidation().requireValueInList(["Activé", "Désactivé"], true).build();
+    feuilleConfig.getRange("B9").setDataValidation(regleActivation);
   }
+
+  // Les classeurs créés avant l'ajout d'un paramètre n'ont pas la ligne correspondante :
+  // sans cette migration, l'option resterait invisible et non modifiable pour eux.
+  assurerParametreConfig(
+    feuilleConfig,
+    "Alerte sur changement",
+    "Activé",
+    "Options : Activé, Désactivé — email dès qu'un site change de niveau",
+    ["Activé", "Désactivé"]
+  );
+
+  const colParam = CONFIG_APP.COLONNES_CONFIG.PARAMETRE;
+  const colVal = CONFIG_APP.COLONNES_CONFIG.VALEUR;
+  const maxLigne = Math.max(feuilleConfig.getLastRow() - 1, 1);
+  const donneesLues = feuilleConfig.getRange(2, 1, maxLigne, Math.max(colParam, colVal)).getValues();
   
-  // Lecture des données actuelles
-  const donneesLues = feuilleConfig.getRange("A2:B15").getValues();
-  const config = { profil: "entreprise", zoneType: "AEP", emailDestinataire: "", freqSync: "Désactivé", heureSync: "08", freqEmail: "Désactivé", heureEmail: "09" };
-  
+  const config = { profil: "entreprise", zoneType: "AEP", emailDestinataire: "", freqSync: "Désactivé", heureSync: "08", freqEmail: "Désactivé", heureEmail: "09", alerteTransition: "Activé" };
+
+  // Les libellés sont comparés sans tenir compte de la casse ni des espaces superflus
+  const valeursLues = {};
   for (const ligne of donneesLues) {
-    if (ligne[0] === "Profil" && ligne[1]) config.profil = ligne[1].toString().trim();
-    if (ligne[0] === "Type de zone" && ligne[1]) config.zoneType = ligne[1].toString().trim();
-    if (ligne[0] === "Email du destinataire" && ligne[1]) config.emailDestinataire = ligne[1].toString().trim();
-    if (ligne[0] === "Fréquence Synchronisation" && ligne[1]) config.freqSync = ligne[1].toString().trim();
-    if (ligne[0] === "Heure Synchronisation" && ligne[1]) config.heureSync = ligne[1].toString().trim();
-    if (ligne[0] === "Fréquence Email" && ligne[1]) config.freqEmail = ligne[1].toString().trim();
-    if (ligne[0] === "Heure Email" && ligne[1]) config.heureEmail = ligne[1].toString().trim();
+    const libelleBrut = ligne[colParam - 1];
+    if (!libelleBrut) continue;
+    const libelle = libelleBrut.toString().trim().toLowerCase();
+    const valBrute = ligne[colVal - 1];
+    const valeur = valBrute === "" || valBrute === null || valBrute === undefined ? "" : valBrute.toString().trim();
+    if (valeur !== "") valeursLues[libelle] = valeur;
   }
-  
+
+  // Une valeur hors liste retombe sur le défaut avec un avertissement
+  const validerListe = (libelle, cle, valeursAutorisees) => {
+    const valeur = valeursLues[libelle];
+    if (valeur === undefined) return;
+    if (valeursAutorisees.indexOf(valeur) === -1) {
+      console.warn(`Configuration : "${valeur}" est invalide pour "${libelle}". Valeur par défaut "${config[cle]}" utilisée.`);
+      return;
+    }
+    config[cle] = valeur;
+  };
+
+  const validerHeure = (libelle, cle) => {
+    const valeur = valeursLues[libelle];
+    if (valeur === undefined) return;
+    const heure = parseInt(valeur, 10);
+    if (isNaN(heure) || heure < 0 || heure > 23) {
+      console.warn(`Configuration : "${valeur}" est une heure invalide pour "${libelle}". Valeur par défaut "${config[cle]}" utilisée.`);
+      return;
+    }
+    config[cle] = heure.toString().padStart(2, "0");
+  };
+
+  const frequences = ["Désactivé", "Quotidien", "Hebdomadaire"];
+
+  validerListe("profil", "profil", ["particulier", "entreprise", "collectivite", "agriculteur"]);
+  validerListe("type de zone", "zoneType", ["AEP", "SOU", "SUP"]);
+  validerListe("fréquence synchronisation", "freqSync", frequences);
+  validerListe("fréquence email", "freqEmail", frequences);
+  validerListe("alerte sur changement", "alerteTransition", ["Activé", "Désactivé"]);
+  validerHeure("heure synchronisation", "heureSync");
+  validerHeure("heure email", "heureEmail");
+
+  const email = valeursLues["email du destinataire"];
+  if (email !== undefined) {
+    if (/^[^@\s]+@[^@\s.]+\.[^@\s]+$/.test(email)) {
+      config.emailDestinataire = email;
+    } else {
+      console.warn(`Configuration : "${email}" n'est pas une adresse email valide. L'utilisateur courant sera utilisé.`);
+    }
+  }
+
   return config;
 };
 
 /**
- * Point d'entrée principal.
+ * Point d'entrée principal : synchronise les restrictions d'eau pour tous les sites.
  */
 function synchroniserVigilanceEau() {
   let interfaceUtilisateur = null;
@@ -198,27 +343,38 @@ function synchroniserVigilanceEau() {
   } catch (e) {
     // Échec silencieux si exécuté via trigger serveur
   }
-  
+
+  // Sans verrou, un lancement manuel qui chevauche le déclencheur horaire
+  // écrit deux fois le même lot de lignes dans la BDD.
+  const verrou = LockService.getScriptLock();
+  if (!verrou.tryLock(CONFIG_APP.ATTENTE_VERROU_MS)) {
+    console.warn("Synchronisation déjà en cours : exécution ignorée.");
+    if (interfaceUtilisateur) interfaceUtilisateur.alert(t("INFO_TITLE"), t("LOCK_BUSY"), interfaceUtilisateur.ButtonSet.OK);
+    return;
+  }
+
   try {
     const classeur = SpreadsheetApp.getActiveSpreadsheet();
     
-    // 0. Récupération des paramètres dynamiques depuis l'onglet Configuration
-    const parametresVigieau = recupererConfigurationUtilisateur(classeur);
+    // 1. Contrôle préalable de l'onglet source Sites
+    const feuilleSites = classeur.getSheetByName(CONFIG_APP.ONGLETS.SITES);
+    if (!feuilleSites) throw new Error(`L'onglet source "${CONFIG_APP.ONGLETS.SITES}" est introuvable.`);
     
-    const feuilleSites = classeur.getSheetByName(CONFIG_VIGIEAU.ONGLET_SITES);
-    const feuilleSuivi = classeur.getSheetByName(CONFIG_VIGIEAU.ONGLET_SUIVI);
-    
-    if (!feuilleSites) throw new Error(`L'onglet source "${CONFIG_VIGIEAU.ONGLET_SITES}" est introuvable.`);
-    if (!feuilleSuivi) throw new Error(`L'onglet de destination "${CONFIG_VIGIEAU.ONGLET_SUIVI}" est introuvable.`);
-    
+    const colNomSite = CONFIG_APP.COLONNES_SITES.ADRESSE;
+    const colGps = CONFIG_APP.COLONNES_SITES.GPS;
+    const ligneDepartSites = CONFIG_APP.LIGNE_DEPART_DONNEES;
+
     const derniereLigneSites = feuilleSites.getLastRow();
-    if (derniereLigneSites < CONFIG_VIGIEAU.LIGNE_DEPART_SITES) {
+    if (derniereLigneSites < ligneDepartSites) {
       if (interfaceUtilisateur) interfaceUtilisateur.alert(t("INFO_TITLE"), t("NO_ADDRESS_TO_PROCESS"), interfaceUtilisateur.ButtonSet.OK);
       return;
     }
     
-    const maxColonne = Math.max(CONFIG_VIGIEAU.COLONNE_NOM_SITE, CONFIG_VIGIEAU.COLONNE_GPS);
-    const donneesSites = feuilleSites.getRange(CONFIG_VIGIEAU.LIGNE_DEPART_SITES, 1, derniereLigneSites - CONFIG_VIGIEAU.LIGNE_DEPART_SITES + 1, maxColonne).getValues();
+    const maxColonne = Math.max(colNomSite, colGps);
+    const donneesSites = feuilleSites.getRange(ligneDepartSites, 1, derniereLigneSites - ligneDepartSites + 1, maxColonne).getValues();
+    
+    // 2. Récupération des paramètres dynamiques depuis l'onglet Configuration
+    const parametresVigieau = recupererConfigurationUtilisateur(classeur);
     
     const dateDuJour = new Date();
     const semaineISO = obtenirSemaineISO(dateDuJour);
@@ -230,19 +386,14 @@ function synchroniserVigilanceEau() {
     const sitesExtraits = [];
     
     for (const ligne of donneesSites) {
-      const nomSite = ligne[CONFIG_VIGIEAU.COLONNE_NOM_SITE - 1];
-      const gps = ligne[CONFIG_VIGIEAU.COLONNE_GPS - 1];
+      const nomSite = ligne[colNomSite - 1];
+      const gps = ligne[colGps - 1];
+      const coords = parserCoordonnees(gps);
       
-      if (gps && typeof gps === 'string' && gps.includes(CONFIG_VIGIEAU.SEPARATEUR_GPS)) {
-        const [latStr, lonStr] = gps.split(CONFIG_VIGIEAU.SEPARATEUR_GPS);
-        const lat = parseFloat(latStr.trim());
-        const lon = parseFloat(lonStr.trim());
-        
-        if (!isNaN(lat) && !isNaN(lon)) {
-          // Utilisation des paramètres utilisateur pour le cache
-          const cleCache = `vigieau_${lat}_${lon}_${parametresVigieau.profil}_${parametresVigieau.zoneType}`;
-          sitesExtraits.push({ nomSite: nomSite || "Site Inconnu", lat, lon, cleCache });
-        }
+      if (coords) {
+        // Clé de cache contextualisée par profil et type de zone
+        const cleCache = `vigieau_${coords.lat}_${coords.lon}_${parametresVigieau.profil}_${parametresVigieau.zoneType}`;
+        sitesExtraits.push({ nomSite: nomSite || "Site Inconnu", lat: coords.lat, lon: coords.lon, cleCache });
       }
     }
     
@@ -251,86 +402,143 @@ function synchroniserVigilanceEau() {
       return;
     }
     
+    // 3. Initialisation de la feuille BDD uniquement si des sites valides sont prêts à être synchronisés
+    const feuilleSuivi = initialiserFeuilleBdd(classeur);
+
+    // L'état antérieur doit être relevé AVANT l'ajout des lignes du jour, sans quoi
+    // la comparaison porterait sur la mesure que l'on vient d'écrire.
+    const etatsPrecedents = construireEtatsPrecedents(feuilleSuivi);
+
     const clesCache = sitesExtraits.map(s => s.cleCache);
     const dictionnaireCache = cache.getAll(clesCache);
     
     const sitesPourAPI = [];
     const requetesApi = [];
-    
+
+    // L'état est mémorisé à l'index du site pour que la BDD conserve strictement l'ordre de
+    // l'onglet Sites, que la valeur vienne du cache ou de l'API.
+    const etatsParSite = new Array(sitesExtraits.length).fill(null);
+
+    sitesExtraits.forEach((site, index) => {
+      if (dictionnaireCache[site.cleCache]) {
+        etatsParSite[index] = dictionnaireCache[site.cleCache];
+        return;
+      }
+      sitesPourAPI.push({ site, index });
+      const parametres = `lon=${site.lon}&lat=${site.lat}&profil=${encodeURIComponent(parametresVigieau.profil)}&zoneType=${encodeURIComponent(parametresVigieau.zoneType)}`;
+      requetesApi.push({
+        url: `${CONFIG_APP.API.VIGIEAU}?${parametres}`,
+        muteHttpExceptions: true
+      });
+    });
+
+    if (requetesApi.length > 0) {
+      const reponses = executerRequetesAvecRetry(requetesApi, CONFIG_APP.MAX_RETRIES);
+      const cacheASauvegarder = {};
+
+      sitesPourAPI.forEach((entree, rang) => {
+        const reponse = reponses[rang];
+        let etatVigilance = "Erreur d'API";
+
+        if (reponse) {
+          const code = reponse.getResponseCode();
+          if (code === 200) {
+            try {
+              etatVigilance = extraireNiveauMax(JSON.parse(reponse.getContentText()));
+            } catch (e) {
+              etatVigilance = "Réponse API invalide";
+            }
+          } else {
+            console.error(`Vigieau HTTP ${code} pour "${entree.site.nomSite}" : ${reponse.getContentText().substring(0, 200)}`);
+          }
+        } else {
+          console.error(`Aucune réponse réseau Vigieau pour "${entree.site.nomSite}".`);
+        }
+
+        // Seul un état mesuré et fiable est mis en cache
+        if (estEtatFiable(etatVigilance)) {
+          cacheASauvegarder[entree.site.cleCache] = etatVigilance;
+        }
+
+        etatsParSite[entree.index] = etatVigilance;
+      });
+
+      if (Object.keys(cacheASauvegarder).length > 0) {
+        cache.putAll(cacheASauvegarder, CONFIG_APP.CACHE_DUREE_SECONDES);
+      }
+    }
+
     const nouvellesLignes = [];
     const couleursLignes = [];
-    const statsBilan = { crise: 0, alerte: 0, vigilance: 0, normal: 0 };
-    
-    const preparerLigne = (site, etatVigilance) => {
+    const liensMaps = [];
+    const statsBilan = { crise: 0, alerte: 0, vigilance: 0, normal: 0, erreur: 0 };
+
+    sitesExtraits.forEach((site, index) => {
+      const etatVigilance = etatsParSite[index] || "Erreur d'API";
       comptabiliserStatistiques(etatVigilance, statsBilan);
-      const lienMaps = `=HYPERLINK("https://www.google.com/maps/search/?api=1&query=${site.lat},${site.lon}"; "📍 Voir sur Maps")`;
-      nouvellesLignes.push([dateFormatee, site.nomSite, etatVigilance, semaineISO, jour, mois, lienMaps]);
-      
-      const couleur = CONFIG_VIGIEAU.COULEURS_FOND[etatVigilance] || "#ffffff";
-      couleursLignes.push([couleur, couleur, couleur, couleur, couleur, couleur, couleur]);
-    };
-    
-    for (const site of sitesExtraits) {
-      if (dictionnaireCache[site.cleCache]) {
-        preparerLigne(site, dictionnaireCache[site.cleCache]);
-      } else {
-        sitesPourAPI.push(site);
-        // Utilisation des paramètres utilisateur pour l'API
-        const parametres = `lon=${site.lon}&lat=${site.lat}&profil=${parametresVigieau.profil}&zoneType=${parametresVigieau.zoneType}`;
-        requetesApi.push({
-          url: `${CONFIG_VIGIEAU.URL_API}?${parametres}`,
-          muteHttpExceptions: true
-        });
-      }
-    }
-    
-    if (requetesApi.length > 0) {
-      const reponses = executerRequetesAvecRetry(requetesApi, CONFIG_VIGIEAU.MAX_RETRIES);
-      const cacheASauvegarder = {};
-      
-      reponses.forEach((reponse, index) => {
-        const site = sitesPourAPI[index];
-        let etatVigilance = "Erreur d'API";
-        
-        if (reponse && reponse.getResponseCode() === 200) {
-          try {
-            const jsonResponse = JSON.parse(reponse.getContentText());
-            etatVigilance = extraireNiveauMax(jsonResponse);
-            cacheASauvegarder[site.cleCache] = etatVigilance;
-          } catch (e) {
-            etatVigilance = "Réponse API invalide";
-          }
-        }
-        
-        preparerLigne(site, etatVigilance);
-      });
-      
-      if (Object.keys(cacheASauvegarder).length > 0) {
-        cache.putAll(cacheASauvegarder, CONFIG_VIGIEAU.CACHE_DUREE_SECONDES);
-      }
-    }
-    
+
+      nouvellesLignes.push([dateFormatee, site.nomSite, etatVigilance, semaineISO, jour, mois, CONFIG_APP.LIBELLE_LIEN_MAPS]);
+      liensMaps.push(`https://www.google.com/maps/search/?api=1&query=${site.lat},${site.lon}`);
+
+      const couleur = CONFIG_APP.COULEURS_FOND[etatVigilance] || "#ffffff";
+      couleursLignes.push(new Array(7).fill(couleur));
+    });
+
     if (nouvellesLignes.length > 0) {
       const derniereLigneSuivi = Math.max(feuilleSuivi.getLastRow(), 1);
       const plageEcriture = feuilleSuivi.getRange(derniereLigneSuivi + 1, 1, nouvellesLignes.length, 7);
-      
+
       plageEcriture.setValues(nouvellesLignes);
       plageEcriture.setBackgrounds(couleursLignes);
-      
+
+      // Lien inséré en texte enrichi pour éviter les conflits de séparateurs régionaux (; vs ,)
+      const valeursEnrichies = liensMaps.map(url => [
+        SpreadsheetApp.newRichTextValue()
+          .setText(CONFIG_APP.LIBELLE_LIEN_MAPS)
+          .setLinkUrl(url)
+          .build()
+      ]);
+      feuilleSuivi.getRange(derniereLigneSuivi + 1, 7, valeursEnrichies.length, 1).setRichTextValues(valeursEnrichies);
+
+      // 4. Alerte sur changement de niveau. Postérieure à l'écriture de la BDD, et
+      // isolée dans son propre try : un échec d'envoi ne doit jamais faire perdre
+      // les relevés qui viennent d'être archivés.
+      let nbTransitions = 0;
+      if (parametresVigieau.alerteTransition === "Activé") {
+        try {
+          const transitions = detecterTransitions(etatsPrecedents, sitesExtraits, etatsParSite);
+          nbTransitions = transitions.changements.length + transitions.nouveaux.length;
+
+          if (nbTransitions > 0) {
+            const destinataire = parametresVigieau.emailDestinataire || Session.getActiveUser().getEmail();
+            envoyerAlerteTransitions(transitions, destinataire);
+          }
+        } catch (erreurAlerte) {
+          console.error(`Alerte de transition non envoyée : ${erreurAlerte.stack}`);
+        }
+      }
+
       if (interfaceUtilisateur) {
         const template = HtmlService.createTemplateFromFile("Bilan");
         template.nbCrise = statsBilan.crise;
         template.nbAlerte = statsBilan.alerte;
         template.nbVigilance = statsBilan.vigilance;
         template.nbNormal = statsBilan.normal;
-        
-        const pageHtml = template.evaluate().setWidth(450).setHeight(400).setTitle(t("MODAL_BILAN_TITLE"));
+        template.nbErreur = statsBilan.erreur;
+        template.nbTransitions = nbTransitions;
+
+        const pageHtml = template.evaluate()
+          .setWidth(CONFIG_APP.FENETRE_BILAN.LARGEUR)
+          .setHeight(CONFIG_APP.FENETRE_BILAN.HAUTEUR)
+          .setTitle(t("MODAL_BILAN_TITLE"));
         interfaceUtilisateur.showModalDialog(pageHtml, t("MODAL_BILAN_TITLE"));
       }
     }
-    
+
   } catch (erreur) {
-    console.error(`Erreur critique : ${erreur.stack}`);
+    console.error(`Erreur critique synchroniserVigilanceEau : ${erreur.stack}`);
     if (interfaceUtilisateur) interfaceUtilisateur.alert(t("ERROR_EXECUTION"), erreur.message, interfaceUtilisateur.ButtonSet.OK);
+  } finally {
+    verrou.releaseLock();
   }
 }

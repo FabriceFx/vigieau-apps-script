@@ -2,7 +2,9 @@
 <html>
 <head>
   <base target="_top">
-  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+        integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
+        crossorigin="anonymous" />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
   <style>
     body { margin: 0; padding: 0; font-family: 'Inter', sans-serif; overflow: hidden; background-color: #e5e5e5; }
@@ -152,11 +154,23 @@
 
   <div id="map"></div>
 
-  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+          integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
+          crossorigin="anonymous"></script>
   <script>
+    // La carte dépend d'un CDN externe : sans ce garde-fou, un réseau filtrant
+    // ou un contrôle d'intégrité en échec afficherait une fenêtre vide et muette.
+    if (typeof L === 'undefined') {
+      document.body.innerHTML = '<div style="padding:32px;font-family:Inter,sans-serif;color:#3c4043;">'
+        + '<strong style="display:block;font-size:16px;margin-bottom:8px;">Carte indisponible</strong>'
+        + 'La bibliothèque cartographique (unpkg.com) n\'a pas pu être chargée. '
+        + 'Vérifiez votre connexion ou les restrictions réseau de votre organisation.</div>';
+      throw new Error('Leaflet indisponible');
+    }
+
     // Récupération des données depuis Google Apps Script
     const sites = <?!= donneesCarto ?>;
-    
+
     // Configuration des couleurs et classes CSS associées
     const COULEURS_VIGILANCE = {
       "Crise": { color: "#d93025", cssClass: "pulse-marker-crise" },

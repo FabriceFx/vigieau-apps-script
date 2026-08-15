@@ -60,6 +60,19 @@ function appliquerPlanification() {
     } else {
       message += t("PLANIF_EMAIL_OFF");
     }
+
+    // 4. Avertissement si l'email risque d'être exécuté avant ou en même temps que la synchro
+    if (config.freqSync !== "Désactivé" && config.freqEmail !== "Désactivé") {
+      const hSync = parseInt(config.heureSync, 10);
+      const hEmail = parseInt(config.heureEmail, 10);
+      if (hEmail <= hSync) {
+        const warning = t("PLANIF_WARNING_SCHEDULE_CONFLICT")
+          .replace("{heureEmail}", config.heureEmail)
+          .replace("{heureSync}", config.heureSync);
+        message += warning;
+        console.warn(`Planification : heureEmail (${config.heureEmail}h) <= heureSync (${config.heureSync}h). Risque de rapport expédié avant la mise à jour.`);
+      }
+    }
     
     interfaceUtilisateur.alert(t("PLANIF_SUCCESS_TITLE"), message, interfaceUtilisateur.ButtonSet.OK);
     

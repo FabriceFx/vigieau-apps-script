@@ -1,48 +1,46 @@
 /**
- * Configuration spécifique au module d'envoi d'emails.
- * @constant {Object}
+ * Module d'alerte et d'envoi du rapport d'état hydrique par email.
  */
-const CONFIG_EMAIL = {
-  ONGLET_SUIVI: "BDD",
-  COLONNE_DATE: 1,
-  COLONNE_SITE: 2,
-  COLONNE_ETAT: 3,
-  ETAT_CRISE: "Crise",
-  // Utilise par défaut l'email de la personne qui exécute le script
-  DESTINATAIRE: Session.getActiveUser().getEmail(), 
-  get SUJET() { return t("EMAIL_SUBJECT"); }
-};
 
 /**
  * Filtre les données de l'onglet de suivi pour récupérer les sites en crise du jour.
+ * Borde la lecture aux N dernières lignes pour préserver les performances sur les gros volumes.
  * @returns {Array<Array>} Tableau contenant les noms des sites et les états.
  */
 const extraireSitesEnCriseDuJour = () => {
   const classeur = SpreadsheetApp.getActiveSpreadsheet();
-  const feuilleSuivi = classeur.getSheetByName(CONFIG_EMAIL.ONGLET_SUIVI);
+  const feuilleSuivi = classeur.getSheetByName(CONFIG_APP.ONGLETS.BDD);
   
   if (!feuilleSuivi) {
-    throw new Error(`L'onglet "${CONFIG_EMAIL.ONGLET_SUIVI}" est introuvable.`);
+    throw new Error(`L'onglet "${CONFIG_APP.ONGLETS.BDD}" est introuvable.`);
   }
 
   const derniereLigne = feuilleSuivi.getLastRow();
-  if (derniereLigne < 2) return [];
+  if (derniereLigne < CONFIG_APP.LIGNE_DEPART_DONNEES) return [];
 
-  // Récupération des données (Horodatage, Site, Etat)
-  const donnees = feuilleSuivi.getRange(2, 1, derniereLigne - 1, 3).getValues();
+  const nbLignesDisponibles = derniereLigne - CONFIG_APP.LIGNE_DEPART_DONNEES + 1;
+  const nbLignesALire = Math.min(nbLignesDisponibles, CONFIG_APP.MAX_LIGNES_HISTORIQUE_LECTURE);
+  const premiereLigneALire = derniereLigne - nbLignesALire + 1;
+
+  const colDate = CONFIG_APP.COLONNES_BDD.DATE;
+  const colSite = CONFIG_APP.COLONNES_BDD.SITE;
+  const colEtat = CONFIG_APP.COLONNES_BDD.ETAT;
+  const maxCol = Math.max(colDate, colSite, colEtat);
+
+  const donnees = feuilleSuivi.getRange(premiereLigneALire, 1, nbLignesALire, maxCol).getValues();
   const dateAujourdhui = new Date().toDateString();
 
-  // Filtrage intelligent avec dédoublonnage (on lit de bas en haut pour garder le statut le plus récent)
+  // Filtrage intelligent avec dédoublonnage (parcours inversé pour garder le statut le plus récent)
   const sitesVus = new Set();
   const donneesFiltrees = [];
   
   for (let i = donnees.length - 1; i >= 0; i--) {
     const ligne = donnees[i];
-    const dateBrute = ligne[CONFIG_EMAIL.COLONNE_DATE - 1];
-    const nomSite = ligne[CONFIG_EMAIL.COLONNE_SITE - 1];
-    const etat = ligne[CONFIG_EMAIL.COLONNE_ETAT - 1];
+    const dateBrute = ligne[colDate - 1];
+    const nomSite = ligne[colSite - 1];
+    const etat = ligne[colEtat - 1];
     
-    if (!dateBrute) continue;
+    if (!dateBrute || !nomSite) continue;
     
     let correspondAujourdhui = false;
     
@@ -59,12 +57,11 @@ const extraireSitesEnCriseDuJour = () => {
     }
     
     if (correspondAujourdhui) {
-      // Si on n'a pas encore traité ce site aujourd'hui (comme on part de la fin, c'est le plus récent)
       if (!sitesVus.has(nomSite)) {
         sitesVus.add(nomSite);
         
-        if (etat === CONFIG_EMAIL.ETAT_CRISE) {
-          donneesFiltrees.unshift(ligne); // Ajoute au début pour préserver l'ordre chronologique
+        if (etat === CONFIG_APP.ETAT_CRISE) {
+          donneesFiltrees.unshift(ligne); // Préserve l'ordre chronologique
         }
       }
     }
@@ -76,22 +73,23 @@ const extraireSitesEnCriseDuJour = () => {
 /**
  * Génère un code HTML stylisé (Material Design) pour l'email.
  * @param {Array<Array>} sitesEnCrise - Les données des sites en crise.
- * @returns {string} Le corps du mail en HTML.
+ * @returns {string} Le corps du mail en HTML sécurisé.
  */
 const genererTemplateHtmlGoogle = (sitesEnCrise) => {
-  // Création dynamique des lignes du tableau HTML
+  const colSite = CONFIG_APP.COLONNES_BDD.SITE;
+  const colEtat = CONFIG_APP.COLONNES_BDD.ETAT;
+
   const lignesHtml = sitesEnCrise.map(ligne => `
     <tr>
       <td style="padding: 12px; border-bottom: 1px solid #dadce0; color: #3c4043; font-weight: 500;">
-        ${ligne[CONFIG_EMAIL.COLONNE_SITE - 1]}
+        ${echapperHtml(ligne[colSite - 1])}
       </td>
       <td style="padding: 12px; border-bottom: 1px solid #dadce0; color: #d93025; font-weight: bold;">
-        ${ligne[CONFIG_EMAIL.COLONNE_ETAT - 1]}
+        ${echapperHtml(ligne[colEtat - 1])}
       </td>
     </tr>
   `).join('');
 
-  // Retourne le template complet en utilisant les littéraux de gabarits (Template Literals)
   return `
     <div style="font-family: 'Google Sans', Roboto, Arial, sans-serif; background-color: #f8f9fa; padding: 24px; margin: 0;">
       <div style="max-width: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 8px; border: 1px solid #dadce0; overflow: hidden;">
@@ -121,7 +119,7 @@ const genererTemplateHtmlGoogle = (sitesEnCrise) => {
           </table>
           
           <p style="color: #5f6368; font-size: 14px; line-height: 1.5; margin-bottom: 0;">
-            Cet email a été généré automatiquement par Google Apps Script.
+            Cet email a été généré automatiquement par Vigieau Tracker.
           </p>
         </div>
       </div>
@@ -139,7 +137,15 @@ function envoyerRapportCrise() {
   } catch (e) {
     // Si exécuté via trigger serveur
   }
-  
+
+  // Évite le double envoi si un lancement manuel croise le déclencheur horaire.
+  const verrou = LockService.getScriptLock();
+  if (!verrou.tryLock(CONFIG_APP.ATTENTE_VERROU_MS)) {
+    console.warn("Envoi de rapport déjà en cours : exécution ignorée.");
+    if (interfaceUtilisateur) interfaceUtilisateur.alert(t("INFO_TITLE"), t("LOCK_BUSY"), interfaceUtilisateur.ButtonSet.OK);
+    return;
+  }
+
   try {
     const classeur = SpreadsheetApp.getActiveSpreadsheet();
     const configUtilisateur = recupererConfigurationUtilisateur(classeur);
@@ -170,7 +176,7 @@ function envoyerRapportCrise() {
     // Envoi de l'email via le service MailApp de Google
     MailApp.sendEmail({
       to: emailCible,
-      subject: CONFIG_EMAIL.SUJET,
+      subject: t("EMAIL_SUBJECT"),
       htmlBody: htmlBody
     });
     
@@ -187,9 +193,11 @@ function envoyerRapportCrise() {
     if (interfaceUtilisateur) {
       interfaceUtilisateur.alert(
         t("ERROR_EXECUTION"), 
-        t("ERROR_EMAIL_SEND") + erreur.message, 
+        t("ERROR_EMAIL_SEND") + erreur.message,
         interfaceUtilisateur.ButtonSet.OK
       );
     }
+  } finally {
+    verrou.releaseLock();
   }
 }

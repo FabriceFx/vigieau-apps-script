@@ -19,6 +19,7 @@ L'outil s'interface avec l'API officielle du gouvernement [Vigieau](https://api.
 * 📍 **Géocodage magique** : Saisissez une adresse, le script récupère automatiquement les coordonnées GPS en tâche de fond (via Trigger `onEdit`).
 * 🔄 **Synchronisation Vigieau** : Interrogation en masse de l'API Vigieau pour connaître le niveau d'alerte sécheresse (Vigilance, Alerte, Alerte renforcée, Crise) de chaque site. 
 * 🎨 **Carte interactive premium** : Visualisation HTML/JS (Leaflet) intégrée dans Google Sheets. Design moderne (*Glassmorphism*), filtrage en temps réel et animations CSS (effet pulse radar) sur les sites en crise.
+* 🔔 **Alerte sur changement de niveau** : Un email part dès qu'un site change de niveau — à l'aggravation comme à la levée des restrictions —, et uniquement dans ce cas. Les aggravations sont présentées en tête. Une panne de l'API n'est jamais interprétée comme un changement de niveau. Se désactive depuis l'onglet **Configuration** (paramètre `Alerte sur changement`).
 * ✉️ **Rapports automatisés** : Envoi de rapports par email contenant le détail des sites au niveau de restriction maximal (Crise).
 * ⚙️ **Tableau de bord et autonomie** : Configuration dynamique depuis le tableur (choix du profil d'entreprise, paramétrage des heures de vérification). Exécution 100% autonome via les déclencheurs (Triggers) Google.
 
@@ -31,7 +32,7 @@ Si vous n'êtes pas familier avec les lignes de commande, c'est la méthode la p
 1. Dans votre Google Sheets, allez dans `Extensions` > `Apps Script`.
 2. Allez dans les paramètres du projet (roue crantée) et cochez **"Afficher le fichier manifeste 'appsscript.json' dans l'éditeur"**.
 3. Dans l'éditeur, copiez-collez le contenu du fichier `appsscript.json` de ce dépôt (ceci configure les autorisations de sécurité nécessaires).
-4. Créez les 7 fichiers de type Script (`.gs`) : `Code.gs`, `VigiEau.gs`, `GPS.gs`, `Cato.gs`, `Mail.gs`, `Planification.gs`, `Lang.gs`.
+4. Créez les 9 fichiers de type Script (`.gs`) : `Config.gs`, `Code.gs`, `VigiEau.gs`, `GPS.gs`, `Transitions.gs`, `Cato.gs`, `Mail.gs`, `Planification.gs`, `Lang.gs`.
 5. Créez les 2 fichiers de type HTML (`.html`) : `Carte.html`, `Bilan.html`.
 6. Copiez-collez le contenu de chaque fichier de ce répertoire GitHub dans les fichiers correspondants de votre projet.
 7. Sauvegardez (`Ctrl+S`).
@@ -51,7 +52,7 @@ Le script va automatiquement créer les onglets nécessaires s'ils sont manquant
    * Colonne B : `Adresse`
    * Colonne C : `GPS`
 2. Lancez la fonction `onOpen()` pour faire apparaître le menu personnalisé **📍 Géolocalisation & eau** dans Google Sheets.
-3. Cliquez sur **2. Récupérer l'état Vigieau (Archivage)** une première fois pour que le script génère l'onglet **Configuration** et l'onglet de destination **BDD**.
+3. Cliquez sur **2. Récupérer l'état Vigieau (Archivage)** une première fois pour que le script génère l'onglet **Configuration** et l'onglet de destination **BDD** avec ses en-têtes.
 
 #### 3. Activer les automatisations
 Depuis le menu personnalisé de Google Sheets :
@@ -71,6 +72,7 @@ The tool interfaces with the official government API [Vigieau](https://api.vigie
 * 📍 **Magic Geocoding**: Enter an address, the script automatically retrieves the GPS coordinates in the background (via `onEdit` Trigger).
 * 🔄 **Vigieau Synchronization**: Mass querying of the Vigieau API to find out the drought alert level (Vigilance, Alert, Reinforced Alert, Crisis) of each site.
 * 🎨 **Premium Interactive Map**: HTML/JS visualization (Leaflet) integrated into Google Sheets. Modern design (*Glassmorphism*), real-time filtering and CSS animations (radar pulse effect) on sites in crisis.
+* 🔔 **Level Change Alerts**: An email is sent as soon as a site changes level — both when restrictions tighten and when they are lifted — and only then. Escalations are listed first. An API outage is never interpreted as a level change. Can be disabled from the **Configuration** tab (`Alerte sur changement` parameter).
 * ✉️ **Automated Reports**: Sending reports by email containing the details of the sites at the maximum restriction level (Crisis).
 * ⚙️ **Dashboard and Autonomy**: Dynamic configuration from the spreadsheet (choice of company profile, setting check times). 100% autonomous execution via Google Triggers.
 
@@ -83,7 +85,7 @@ If you are not familiar with command lines, this is the easiest method:
 1. In your Google Sheets, go to `Extensions` > `Apps Script`.
 2. Go to Project Settings (gear icon) and check **"Show 'appsscript.json' manifest file in editor"**.
 3. In the editor, copy and paste the content of the `appsscript.json` file from this repository (this sets the strict security permissions required).
-4. Create the 7 Script type files (`.gs`): `Code.gs`, `VigiEau.gs`, `GPS.gs`, `Cato.gs`, `Mail.gs`, `Planification.gs`, `Lang.gs`.
+4. Create the 9 Script type files (`.gs`): `Config.gs`, `Code.gs`, `VigiEau.gs`, `GPS.gs`, `Transitions.gs`, `Cato.gs`, `Mail.gs`, `Planification.gs`, `Lang.gs`.
 5. Create the 2 HTML type files (`.html`): `Carte.html`, `Bilan.html`.
 6. Copy-paste the content of each file from this GitHub repository into the corresponding files of your project.
 7. Save (`Ctrl+S`).
