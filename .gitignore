@@ -1,0 +1,17 @@
+# Clasp configuration et authentification
+.clasp.json
+.clasprc.json
+
+# Fichiers système
+.DS_Store
+Thumbs.db
+
+# Dépendances et logs
+node_modules/
+npm-debug.log*
+
+# Fichiers temporaires d'éditeurs
+.idea/
+.vscode/
+*.swp
+*.swo
